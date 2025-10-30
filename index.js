@@ -102,25 +102,29 @@ async function request(url, options = {}, token = null) {
 
 // ==================== 邮件发送 ====================
 async function sendEmailWithQRCode(uuid, qrBuffer) {
-  console.log("📧 正在发送二维码邮件...");
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.qq.com",
-    port: parseInt(process.env.SMTP_PORT || 465),
-    secure: true,
-    auth: { user: process.env.SMTP_USER || "1323943635@qq.com", pass: process.env.SMTP_PASS || "vfqtkervzmldghjj" },
-  });
+    console.log("📧 正在发送二维码邮件...");
+    try {
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || "smtp.qq.com",
+            port: parseInt(process.env.SMTP_PORT || 465),
+            secure: true,
+            auth: { user: process.env.SMTP_USER || "1323943635@qq.com", pass: process.env.SMTP_PASS || "vfqtkervzmldghjj" },
+        });
 
-  const qrPath = path.resolve(`./qrcode.png`);
-  fs.writeFileSync(qrPath, qrBuffer);
-
-  const info = await transporter.sendMail({
-    from: `"WeChat Login" <${process.env.SMTP_USER}>`,
-    to: process.env.TO_EMAIL,
-    subject: "请扫码登录微信（自动签到机器人）",
-    text: "请使用微信扫描附件二维码进行登录授权。",
-    attachments: [{ filename: `wechat_login_${uuid}.png`, path: qrPath }],
-  });
-  console.log("✅ 邮件已发送:", info.messageId);
+        const qrPath = path.resolve(`./qrcode.png`);
+        fs.writeFileSync(qrPath, qrBuffer);
+        
+        const info = await transporter.sendMail({
+            from: `"WeChat Login" <${process.env.SMTP_USER}>`,
+            to: process.env.TO_EMAIL,
+            subject: "请扫码登录微信（自动签到机器人）",
+            text: "请使用微信扫描附件二维码进行登录授权。",
+            attachments: [{ filename: `wechat_login_${uuid}.png`, path: qrPath }],
+        });
+        console.log("✅ 邮件已发送:", info.messageId);
+    } catch (err) {
+        console.log(`发送邮件失败：请前往网址扫描二维码：${qrUrl}`)
+    }
 }
 
 // ==================== 微信登录 ====================
@@ -149,7 +153,7 @@ async function pollWxCode(uuid) {
       console.log("\n⚠️ 二维码过期，请重试");
       return null;
     }
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 1000));
   }
 }
 
@@ -212,12 +216,7 @@ async function main() {
     const qrBuffer = Buffer.from(await qrRes.arrayBuffer());
 
     await printAsciiQRCode(uuid);
-      try {
-        await sendEmailWithQRCode(uuid, qrBuffer);
-      } catch (err) {
-          console.log(`发送邮件失败：请前往网址扫描二维码：${qrUrl}`)
-    }
-
+    await sendEmailWithQRCode(uuid, qrBuffer);
     const wxCode = await pollWxCode(uuid);
     if (!wxCode) throw new Error("❌ 扫码登录失败");
 
