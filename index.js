@@ -207,11 +207,16 @@ async function main() {
     console.log("⚠️ Token 不存在或已过期，正在生成二维码...");
 
     const uuid = await fetchUUID();
-    const qrRes = await fetch(`https://open.weixin.qq.com/connect/qrcode/${uuid}`);
+    const qrUrl = `https://open.weixin.qq.com/connect/qrcode/${uuid}`
+    const qrRes = await fetch(qrUrl);
     const qrBuffer = Buffer.from(await qrRes.arrayBuffer());
 
     await printAsciiQRCode(uuid);
-    await sendEmailWithQRCode(uuid, qrBuffer);
+      try {
+        await sendEmailWithQRCode(uuid, qrBuffer);
+      } catch (err) {
+          console.log(`发送邮件失败：请前往网址扫描二维码：${qrUrl}`)
+    }
 
     const wxCode = await pollWxCode(uuid);
     if (!wxCode) throw new Error("❌ 扫码登录失败");
