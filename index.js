@@ -123,7 +123,7 @@ async function sendEmailWithQRCode(uuid, qrBuffer) {
         });
         console.log("✅ 邮件已发送:", info.messageId);
     } catch (err) {
-        console.log(`发送邮件失败：请前往网址扫描二维码：${qrUrl}`)
+        console.log(`发送邮件失败：请前往网址扫描二维码：https://open.weixin.qq.com/connect/qrcode/${uuid}`)
     }
 }
 
