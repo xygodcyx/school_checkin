@@ -13,31 +13,43 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # 设置 Node.js 并启用 pnpm 缓存
+      # 安装 Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-          cache: 'pnpm'
 
-      # 恢复 config 缓存
-      - name: Restore config cache
+      # 安装 pnpm
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      # 恢复依赖缓存
+      - name: Cache node_modules
+        uses: actions/cache@v3
+        id: pnpm-cache
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('package-lock.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      # 安装依赖
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 恢复或生成 config.json
+      - name: Restore config
         uses: actions/cache@v3
         id: config-cache
         with:
           path: config.json
           key: config-${{ runner.os }}-latest
 
-      # 写入或生成 config 文件（如果不存在）
-      - name: Generate config
+      - name: Generate config if missing
         run: |
           if [ ! -f config.json ]; then
             echo '{}' > config.json
           fi
-
-      # 安装依赖
-      - name: Install dependencies
-        run: pnpm install
 
       # 运行 WeChat 签到脚本
       - name: Run WeChat checkin script
@@ -45,6 +57,7 @@ jobs:
           APPID: ${{ secrets.APPID }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
           IS_GITHUB_ACTIONS: ${{ secrets.IS_GITHUB_ACTIONS }}
+
         run: node index.js
 
       # 保存 config 缓存
@@ -53,7 +66,3 @@ jobs:
         with:
           path: config.json
           key: config-${{ runner.os }}-latest
-
-      # 可选：查看 config
-      - name: Show config
-        run: cat config.json
