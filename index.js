@@ -12,6 +12,9 @@ dotenv.config();
 
 // 判断是否在 GitHub Actions 环境
 const isGithubAction = !!process.env.IS_GITHUB_ACTIONS
+const CACHE_DIR = '.config-cache'
+const CONFIG_FILE = "./config.json";
+const CACHE_PATH = path.join(CACHE_DIR, CONFIG_FILE)
 
 /**
  * 读取配置
@@ -58,7 +61,6 @@ function isTokenValid(config) {
 }
 
 // ==================== 全局配置 ====================
-const CONFIG_FILE = "./config.json";
 const APPID = process.env.APPID || "wx4a23ae4b8f291087";
 const REDIRECT_URI = "https%3A%2F%2Fi.jielong.com%2Flogin-callback";
 
