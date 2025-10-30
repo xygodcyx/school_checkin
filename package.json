@@ -3,6 +3,7 @@
 	"version": "1.0.0",
 	"description": "获取wx_code:\r https://lp.open.weixin.qq.com/connect/l/qrconnect?uuid=021a8ujs2zXWZv3S&last=404",
 	"main": "index.js",
+	"type": "module",
 	"devDependencies": {},
 	"scripts": {
 		"start": "node index.js"
