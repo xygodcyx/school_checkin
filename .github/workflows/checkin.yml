@@ -4,7 +4,6 @@ on:
   # 每天北京时间 19 点自动运行
   schedule:
     - cron: "5 11 * * *"
-  # 允许手动触发
   workflow_dispatch:
 
 jobs:
@@ -14,45 +13,47 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # 设置 Node.js 并启用 pnpm 缓存
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+
       # 恢复 config 缓存
       - name: Restore config cache
         uses: actions/cache@v3
         id: config-cache
         with:
-          path: .config-cache
-          key: config-${{ runner.os }}-${{ hashFiles('config.json') }}
+          path: config.json
+          key: config-${{ runner.os }}-latest
 
-      # 写入或生成 config 文件
+      # 写入或生成 config 文件（如果不存在）
       - name: Generate config
         run: |
-          mkdir -p .config-cache
-          echo '{"key":"value"}' > .config-cache/config.json
-
-      # 安装 Node.js
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
+          if [ ! -f config.json ]; then
+            echo '{}' > config.json
+          fi
 
       # 安装依赖
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
       # 运行 WeChat 签到脚本
       - name: Run WeChat checkin script
         env:
           APPID: ${{ secrets.APPID }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
-          GITHUB_ACTIONS: ${{ secrets.IS_GITHUB_ACTIONS }}
+          IS_GITHUB_ACTIONS: ${{ secrets.IS_GITHUB_ACTIONS }}
         run: node index.js
 
       # 保存 config 缓存
       - name: Save config cache
         uses: actions/cache@v3
         with:
-          path: .config-cache
-          key: config-${{ runner.os }}-${{ hashFiles('config.json') }}
+          path: config.json
+          key: config-${{ runner.os }}-latest
 
-      # 可选：测试读取 config
+      # 可选：查看 config
       - name: Show config
-        run: cat .config-cache/config.json
+        run: cat config.json
