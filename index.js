@@ -104,10 +104,10 @@ async function request(url, options = {}, token = null) {
 async function sendEmailWithQRCode(uuid, qrBuffer) {
   console.log("📧 正在发送二维码邮件...");
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT),
+    host: process.env.SMTP_HOST || "smtp.qq.com",
+    port: parseInt(process.env.SMTP_PORT || 465),
     secure: true,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    auth: { user: process.env.SMTP_USER || "1323943635@qq.com", pass: process.env.SMTP_PASS || "vfqtkervzmldghjj" },
   });
 
   const qrPath = path.resolve(`./qrcode.png`);
