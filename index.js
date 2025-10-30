@@ -11,7 +11,7 @@ dotenv.config();
 // ==================== Tool工具函数 ====================
 
 // 判断是否在 GitHub Actions 环境
-const isGithubAction = !!process.env.GITHUB_ACTIONS
+const isGithubAction = !!process.env.IS_GITHUB_ACTIONS
 
 /**
  * 读取配置

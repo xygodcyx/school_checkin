@@ -43,7 +43,7 @@ jobs:
         env:
           APPID: ${{ secrets.APPID }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
-          GITHUB_ACTIONS: ${{ secrets.GITHUB_ACTIONS }}
+          GITHUB_ACTIONS: ${{ secrets.IS_GITHUB_ACTIONS }}
         run: node index.js
 
       # 保存 config 缓存
