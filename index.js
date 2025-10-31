@@ -94,8 +94,8 @@ const REDIRECT_URI =
 // 签到相关
 const THREAD_ID = 163231508
 const DEFAULT_LOCATION = {
-  latitude: 28.42995,
-  longitude: 117.964691,
+  latitude: 28.423147,
+  longitude: 117.976543,
 }
 
 // ==================== 通用请求封装 ====================
@@ -281,7 +281,7 @@ async function submitCheckIn(
         Values: [
           JSON.stringify(location || DEFAULT_LOCATION),
         ],
-        Texts: ['上饶市信州区•上饶市信州区人民政府'],
+        Texts: ['上饶市信州区•上饶师范学院'],
         HasValue: true,
       },
     ],
