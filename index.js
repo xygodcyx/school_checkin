@@ -20,7 +20,7 @@ const CONFIG_FILE = './config.json'
  */
 export async function getConfig() {
   try {
-    // 本地开发，直接读同目录下 config.json
+    // 运行在 GitHub Actions 时，从远程拉取 config（你之前的逻辑）
     if (isGithubAction) {
       console.log('远程仓库，从github获取')
       const configPromise = (
@@ -152,24 +152,34 @@ async function sendEmailWithQRCode(uuid, qrBuffer) {
     })
     console.log('✅ 邮件已发送:', info.messageId)
   } catch (err) {
+    // 发送失败仅记录，不抛出
     console.log(
-      `发送邮件失败：请前往网址扫描二维码：https://open.weixin.qq.com/connect/qrcode/${uuid}`
+      `⚠️ 发送邮件失败：请前往网址扫描二维码：https://open.weixin.qq.com/connect/qrcode/${uuid}`
     )
   }
 }
 
 async function sendCheckinResult(result) {
-  console.log('📧 正在发送签到结果邮件...')
-  const transporter = createMailSender()
-  const info = await transporter.sendMail({
-    from: `"WeChat Login" <${
-      process.env.SMTP_USER || '1323943635@qq.com'
-    }>`,
-    to: process.env.TO_EMAIL,
-    subject: `签到结果 - ${result.Data}`,
-    text: `${result.Description}`,
-  })
-  console.log('✅ 邮件已发送:', info.messageId)
+  try {
+    console.log('📧 正在发送签到结果邮件...')
+    const transporter = createMailSender()
+    const info = await transporter.sendMail({
+      from: `"WeChat Login" <${
+        process.env.SMTP_USER || '1323943635@qq.com'
+      }>`,
+      to: process.env.TO_EMAIL,
+      subject: `签到结果 - ${result?.Data || '未知'}`,
+      text: `${
+        result?.Description || JSON.stringify(result)
+      }`,
+    })
+    console.log('✅ 邮件已发送:', info.messageId)
+  } catch (err) {
+    console.warn(
+      '⚠️ 发送签到结果邮件失败:',
+      err?.message || err
+    )
+  }
 }
 
 // ==================== 微信登录 ====================
@@ -276,45 +286,96 @@ async function submitCheckIn(
   )
 }
 
-// ==================== 主流程 ====================
-async function main() {
+// ==================== 主流程：确保登录（无限重试直到扫码成功） ====================
+async function ensureLoggedIn() {
   let config = await getConfig()
-  console.log(config)
-
-  if (!isTokenValid(config)) {
-    console.log(
-      '⚠️ Token 不存在或已过期，正在生成二维码...'
-    )
-
-    const uuid = await fetchUUID()
-    const qrUrl = `https://open.weixin.qq.com/connect/qrcode/${uuid}`
-    const qrRes = await fetch(qrUrl)
-    const qrBuffer = Buffer.from(await qrRes.arrayBuffer())
-
-    await printAsciiQRCode(uuid)
-    await sendEmailWithQRCode(uuid, qrBuffer)
-    const wxCode = await pollWxCode(uuid)
-    if (!wxCode) throw new Error('❌ 扫码登录失败')
-
-    const { token, expire } = await fetchTokenByWxCode(
-      wxCode
-    )
-    config = { token, expire }
-    setConfig(config)
-    console.log('\n🎉 新 Token 已保存到 config.json')
-  } else {
+  if (isTokenValid(config)) {
     console.log('✅ 检测到有效 Token，无需重新扫码。')
+    return config
   }
 
-  console.log('\n📋 开始签到...')
-  const info = await getCheckInInfo(config.token)
-  console.log('签到信息:', info)
+  while (true) {
+    console.log(
+      '⚠️ Token 不存在或已过期，生成新的二维码并等待扫码...'
+    )
 
-  const result = await submitCheckIn(config.token)
-  console.log('✅ 签到完成:', result)
-  await sendCheckinResult(result)
+    let uuid
+    try {
+      uuid = await fetchUUID()
+    } catch (err) {
+      console.error(
+        '获取 UUID 失败，稍后重试：',
+        err?.message || err
+      )
+      await new Promise(r => setTimeout(r, 2000))
+      continue
+    }
+
+    const qrRes = await fetch(
+      `https://open.weixin.qq.com/connect/qrcode/${uuid}`
+    )
+    const qrBuffer = Buffer.from(await qrRes.arrayBuffer())
+
+    // 打印到控制台并尝试发送邮件（邮件失败不会阻塞）
+    try {
+      await printAsciiQRCode(uuid)
+    } catch (err) {
+      console.warn(
+        '打印到控制台失败，仍会继续。',
+        err?.message || err
+      )
+    }
+
+    // 发送邮件但不抛出错误
+    await sendEmailWithQRCode(uuid, qrBuffer)
+
+    // 等待扫码（阻塞直到扫码成功或二维码过期）
+    const wxCode = await pollWxCode(uuid)
+    if (!wxCode) {
+      // 二维码过期，短暂等待并重试获取新的二维码
+      console.log('二维码过期，准备重新生成新的二维码...')
+      await new Promise(r => setTimeout(r, 2000))
+      continue
+    }
+
+    // 成功拿到 wx_code，尝试换取 token
+    try {
+      const { token, expire } = await fetchTokenByWxCode(
+        wxCode
+      )
+      const newConfig = { token, expire }
+      setConfig(newConfig)
+      console.log('\n🎉 新 Token 已保存到 config.json')
+      return newConfig
+    } catch (err) {
+      console.error(
+        '用 wx_code 换取 Token 失败，稍后重试：',
+        err?.message || err
+      )
+      await new Promise(r => setTimeout(r, 2000))
+      // 不直接退出，继续循环重新生成二维码
+    }
+  }
 }
 
-main().catch(err =>
-  console.error('❌ 运行出错:', err.message)
-)
+// ==================== 主流程：签到 ====================
+async function main() {
+  try {
+    const config = await ensureLoggedIn()
+
+    console.log('\n📋 开始签到...')
+    const info = await getCheckInInfo(config.token)
+    console.log('签到信息:', info)
+
+    const result = await submitCheckIn(config.token)
+    console.log('✅ 签到完成:', result)
+
+    // 发送签到结果邮件（可选，失败不阻塞）
+    await sendCheckinResult(result)
+  } catch (err) {
+    console.error('❌ 运行出错:', err.message || err)
+    process.exit(1)
+  }
+}
+
+main()
