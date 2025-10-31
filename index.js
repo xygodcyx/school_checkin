@@ -290,6 +290,7 @@ async function submitCheckIn(
 async function ensureLoggedIn() {
   let config = await getConfig()
   if (isTokenValid(config)) {
+    setConfig(config)
     console.log('✅ 检测到有效 Token，无需重新扫码。')
     return config
   }
