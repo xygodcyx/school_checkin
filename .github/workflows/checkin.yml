@@ -16,12 +16,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Checkout gh-pages branch (e.g. gh-pages)
-        uses: actions/checkout@v3
-        with:
-          ref: gh-pages
-          path: gh-pages  # 把它放到子目录，避免覆盖 main 的内容
-
       # 安装 Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
