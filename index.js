@@ -32,6 +32,9 @@ export async function getConfig() {
         const config = await configPromise
         return config
       } catch (error) {
+        console.log(
+          '获取config失败，可能是文件不存在，正在重新获取'
+        )
         return null
       }
     } else {
@@ -63,6 +66,7 @@ export function setConfig(data) {
 
 function isTokenValid(config) {
   return (
+    config &&
     config?.token &&
     config?.expire &&
     Date.now() < config.expire
