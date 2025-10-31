@@ -10,7 +10,11 @@ dotenv.config()
 
 // ==================== Tool工具函数 ====================
 
-const CONFIG_FILE = './config.json'
+// 判断是否在 GitHub Actions 环境
+const isGithubAction = !!process.env.IS_GITHUB_ACTIONS
+const CONFIG_FILE = isGithubAction
+  ? './gh-pages/config.json'
+  : './config.json'
 
 /**
  * 读取配置
