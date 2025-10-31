@@ -12,9 +12,7 @@ dotenv.config()
 
 // 判断是否在 GitHub Actions 环境
 const isGithubAction = !!process.env.IS_GITHUB_ACTIONS
-const CONFIG_FILE = isGithubAction
-  ? 'https://xygodcyx.github.io/school_checkin/config.json'
-  : './config.json'
+const CONFIG_FILE = './config.json'
 
 /**
  * 读取配置
@@ -26,7 +24,9 @@ export async function getConfig() {
     if (isGithubAction) {
       console.log('远程仓库，从github获取')
       const configPromise = (
-        await fetch(CONFIG_FILE)
+        await fetch(
+          'https://xygodcyx.github.io/school_checkin/config.json'
+        )
       ).json()
       const config = await configPromise
       return config
