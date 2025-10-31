@@ -8,24 +8,57 @@ import nodemailer from 'nodemailer'
 import dotenv from 'dotenv'
 dotenv.config()
 
-// ==================== Tool工具函数 ====================
+// ==================== Tool 工具函数 ====================
 
 // 判断是否在 GitHub Actions 环境
 const isGithubAction = !!process.env.IS_GITHUB_ACTIONS
-const CONFIG_FILE = isGithubAction
-  ? './gh-pages/config.json'
-  : './config.json'
 
-/**
- * 读取配置
- * @returns {object|null} 配置对象，如果不存在返回 null
- */
-export function getConfig() {
+// === 新增：仓库信息（建议用环境变量，默认自动推断） ===
+const GITHUB_OWNER = process.env.GITHUB_OWNER || 'xygodcyx'
+const GITHUB_REPO =
+  process.env.GITHUB_REPO || 'school_checkin'
+const GITHUB_BRANCH =
+  process.env.GITHUB_BRANCH || 'gh-pages'
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN // 可选，用于提升请求速率限制
+
+// 本地优先读 ./config.json
+const LOCAL_CONFIG_FILE = './config.json'
+
+// === 改进版 getConfig ===
+export async function getConfig() {
   try {
-    // 本地开发，直接读同目录下 config.json
-    if (!fs.existsSync(CONFIG_FILE)) return null
-    const raw = fs.readFileSync(CONFIG_FILE, 'utf-8')
-    return JSON.parse(raw)
+    if (!isGithubAction) {
+      // 本地优先
+      if (fs.existsSync(LOCAL_CONFIG_FILE)) {
+        const raw = fs.readFileSync(
+          LOCAL_CONFIG_FILE,
+          'utf-8'
+        )
+        return JSON.parse(raw)
+      }
+    } else {
+      // 若本地没有，则尝试从 GitHub 仓库另一分支获取
+      console.log(
+        `⚙️ 从 GitHub 分支 ${GITHUB_BRANCH} 读取 config.json ...`
+      )
+      const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/config.json?ref=${GITHUB_BRANCH}`
+      const res = await fetch(url, {
+        headers: {
+          Accept: 'application/vnd.github.v3.raw',
+          ...(GITHUB_TOKEN
+            ? { Authorization: `token ${GITHUB_TOKEN}` }
+            : {}),
+        },
+      })
+      if (!res.ok) {
+        console.error(
+          `❌ 获取远程配置失败: HTTP ${res.status}`
+        )
+        return null
+      }
+      const text = await res.text()
+      return JSON.parse(text)
+    }
   } catch (err) {
     console.error('Failed to read config:', err)
     return null
@@ -39,7 +72,7 @@ export function getConfig() {
 export function setConfig(data) {
   try {
     fs.writeFileSync(
-      CONFIG_FILE,
+      LOCAL_CONFIG_FILE,
       JSON.stringify(data, null, 2),
       'utf-8'
     )
@@ -248,7 +281,7 @@ async function submitCheckIn(
 
 // ==================== 主流程 ====================
 async function main() {
-  let config = getConfig()
+  let config = await getConfig()
 
   if (!isTokenValid(config)) {
     console.log(

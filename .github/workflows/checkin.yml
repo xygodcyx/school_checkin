@@ -51,6 +51,7 @@ jobs:
         env:
           APPID: ${{ secrets.APPID }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           IS_GITHUB_ACTIONS: true
 
         run: node index.js
