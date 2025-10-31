@@ -23,13 +23,20 @@ export async function getConfig() {
     // 运行在 GitHub Actions 时，从远程拉取 config（你之前的逻辑）
     if (isGithubAction) {
       console.log('远程仓库，从github获取')
-      const configPromise = (
-        await fetch(
-          'https://xygodcyx.github.io/school_checkin/config.json'
+      try {
+        const configPromise = (
+          await fetch(
+            'https://xygodcyx.github.io/school_checkin/config.json'
+          )
+        ).json()
+        const config = await configPromise
+        return config
+      } catch (error) {
+        console.log(
+          '获取config失败，可能是文件不存在，正在重新获取'
         )
-      ).json()
-      const config = await configPromise
-      return config
+        return null
+      }
     } else {
       if (!fs.existsSync(CONFIG_FILE)) return null
       const raw = fs.readFileSync(CONFIG_FILE, 'utf-8')
@@ -59,6 +66,7 @@ export function setConfig(data) {
 
 function isTokenValid(config) {
   return (
+    config &&
     config?.token &&
     config?.expire &&
     Date.now() < config.expire
