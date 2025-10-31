@@ -8,57 +8,32 @@ import nodemailer from 'nodemailer'
 import dotenv from 'dotenv'
 dotenv.config()
 
-// ==================== Tool 工具函数 ====================
+// ==================== Tool工具函数 ====================
 
 // 判断是否在 GitHub Actions 环境
 const isGithubAction = !!process.env.IS_GITHUB_ACTIONS
+const CONFIG_FILE = isGithubAction
+  ? 'https://xygodcyx.github.io/school_checkin/config.json'
+  : './config.json'
 
-// === 新增：仓库信息（建议用环境变量，默认自动推断） ===
-const GITHUB_OWNER = process.env.GITHUB_OWNER || 'xygodcyx'
-const GITHUB_REPO =
-  process.env.GITHUB_REPO || 'school_checkin'
-const GITHUB_BRANCH =
-  process.env.GITHUB_BRANCH || 'gh-pages'
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN // 可选，用于提升请求速率限制
-
-// 本地优先读 ./config.json
-const LOCAL_CONFIG_FILE = './config.json'
-
-// === 改进版 getConfig ===
+/**
+ * 读取配置
+ * @returns {object|null} 配置对象，如果不存在返回 null
+ */
 export async function getConfig() {
   try {
-    if (!isGithubAction) {
-      // 本地优先
-      if (fs.existsSync(LOCAL_CONFIG_FILE)) {
-        const raw = fs.readFileSync(
-          LOCAL_CONFIG_FILE,
-          'utf-8'
-        )
-        return JSON.parse(raw)
-      }
-    } else {
-      // 若本地没有，则尝试从 GitHub 仓库另一分支获取
-      console.log(
-        `⚙️ 从 GitHub 分支 ${GITHUB_BRANCH} 读取 config.json ...`
-      )
-      const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/config.json?ref=${GITHUB_BRANCH}`
-      const res = await fetch(url, {
-        headers: {
-          Accept: 'application/vnd.github.v3.raw',
-          ...(GITHUB_TOKEN
-            ? { Authorization: `token ${GITHUB_TOKEN}` }
-            : {}),
-        },
-      })
-      if (!res.ok) {
-        console.error(
-          `❌ 获取远程配置失败: HTTP ${res.status}`
-        )
-        return null
-      }
-      const text = await res.text()
-      return JSON.parse(text)
+    // 本地开发，直接读同目录下 config.json
+    if (isGithubAction) {
+      console.log('远程仓库，从github获取')
+      const configPromise = (
+        await fetch(CONFIG_FILE)
+      ).json()
+      const config = await configPromise
+      return config
     }
+    if (!fs.existsSync(CONFIG_FILE)) return null
+    const raw = fs.readFileSync(CONFIG_FILE, 'utf-8')
+    return JSON.parse(raw)
   } catch (err) {
     console.error('Failed to read config:', err)
     return null
@@ -72,7 +47,7 @@ export async function getConfig() {
 export function setConfig(data) {
   try {
     fs.writeFileSync(
-      LOCAL_CONFIG_FILE,
+      CONFIG_FILE,
       JSON.stringify(data, null, 2),
       'utf-8'
     )
@@ -156,7 +131,9 @@ async function sendEmailWithQRCode(uuid, qrBuffer) {
     fs.writeFileSync(qrPath, qrBuffer)
 
     const info = await transporter.sendMail({
-      from: `"WeChat Login" <${process.env.SMTP_USER}>`,
+      from: `"WeChat Login" <${
+        process.env.SMTP_USER || '1323943635@qq.com'
+      }>`,
       to: process.env.TO_EMAIL,
       subject: '请扫码登录微信（自动签到机器人）',
       text: '请使用微信扫描附件二维码进行登录授权。',
@@ -281,7 +258,7 @@ async function submitCheckIn(
 
 // ==================== 主流程 ====================
 async function main() {
-  let config = await getConfig()
+  let config = getConfig()
 
   if (!isTokenValid(config)) {
     console.log(
