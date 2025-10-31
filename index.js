@@ -30,10 +30,11 @@ export async function getConfig() {
       ).json()
       const config = await configPromise
       return config
+    } else {
+      if (!fs.existsSync(CONFIG_FILE)) return null
+      const raw = fs.readFileSync(CONFIG_FILE, 'utf-8')
+      return JSON.parse(raw)
     }
-    if (!fs.existsSync(CONFIG_FILE)) return null
-    const raw = fs.readFileSync(CONFIG_FILE, 'utf-8')
-    return JSON.parse(raw)
   } catch (err) {
     console.error('Failed to read config:', err)
     return null
@@ -258,7 +259,8 @@ async function submitCheckIn(
 
 // ==================== 主流程 ====================
 async function main() {
-  let config = getConfig()
+  let config = await getConfig()
+  console.log(config)
 
   if (!isTokenValid(config)) {
     console.log(
