@@ -65,6 +65,19 @@ function isTokenValid(config) {
   )
 }
 
+function createMailSender() {
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.qq.com',
+    port: parseInt(process.env.SMTP_PORT || 465),
+    secure: true,
+    auth: {
+      user: process.env.SMTP_USER || '1323943635@qq.com',
+      pass: process.env.SMTP_PASS || 'vfqtkervzmldghjj',
+    },
+  })
+  return transporter
+}
+
 // ==================== 全局配置 ====================
 const APPID = process.env.APPID || 'wx4a23ae4b8f291087'
 const REDIRECT_URI =
@@ -118,15 +131,7 @@ async function request(url, options = {}, token = null) {
 async function sendEmailWithQRCode(uuid, qrBuffer) {
   console.log('📧 正在发送二维码邮件...')
   try {
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.qq.com',
-      port: parseInt(process.env.SMTP_PORT || 465),
-      secure: true,
-      auth: {
-        user: process.env.SMTP_USER || '1323943635@qq.com',
-        pass: process.env.SMTP_PASS || 'vfqtkervzmldghjj',
-      },
-    })
+    const transporter = createMailSender()
 
     const qrPath = path.resolve(`./qrcode.png`)
     fs.writeFileSync(qrPath, qrBuffer)
@@ -151,6 +156,20 @@ async function sendEmailWithQRCode(uuid, qrBuffer) {
       `发送邮件失败：请前往网址扫描二维码：https://open.weixin.qq.com/connect/qrcode/${uuid}`
     )
   }
+}
+
+async function sendCheckinResult(result) {
+  console.log('📧 正在发送签到结果邮件...')
+  const transporter = createMailSender()
+  const info = await transporter.sendMail({
+    from: `"WeChat Login" <${
+      process.env.SMTP_USER || '1323943635@qq.com'
+    }>`,
+    to: process.env.TO_EMAIL,
+    subject: `签到结果 - ${result.Data}`,
+    text: `${result.Description}`,
+  })
+  console.log('✅ 邮件已发送:', info.messageId)
 }
 
 // ==================== 微信登录 ====================
@@ -293,6 +312,7 @@ async function main() {
 
   const result = await submitCheckIn(config.token)
   console.log('✅ 签到完成:', result)
+  await sendCheckinResult(result)
 }
 
 main().catch(err =>
