@@ -3,7 +3,7 @@ name: WeChat Daily Checkin
 on:
   # 每天北京时间 19 点自动运行
   schedule:
-    - cron: "5 11 * * *"
+    - cron: '5 11 * * *'
   workflow_dispatch:
 
 jobs:
@@ -37,32 +37,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # 恢复或生成 config.json
-      - name: Restore config
-        uses: actions/cache@v3
-        id: config-cache
-        with:
-          path: config.json
-          key: config-${{ runner.os }}-latest
-
-      - name: Generate config if missing
-        run: |
-          if [ ! -f config.json ]; then
-            echo '{}' > config.json
-          fi
-
       # 运行 WeChat 签到脚本
       - name: Run WeChat checkin script
         env:
           APPID: ${{ secrets.APPID }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
-          IS_GITHUB_ACTIONS: ${{ secrets.IS_GITHUB_ACTIONS }}
+          IS_GITHUB_ACTIONS: true
 
         run: node index.js
 
-      # 保存 config 缓存
-      - name: Save config cache
-        uses: actions/cache@v3
+      #部署到github
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: config.json
-          key: config-${{ runner.os }}-latest
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
