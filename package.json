@@ -2,11 +2,10 @@
 	"name": "school_checkin",
 	"version": "1.0.0",
 	"description": "获取wx_code:\r https://lp.open.weixin.qq.com/connect/l/qrconnect?uuid=021a8ujs2zXWZv3S&last=404",
-	"main": "index.js",
+	"main": "main.js",
 	"type": "module",
-	"devDependencies": {},
 	"scripts": {
-		"start": "node index.js"
+		"start": "bun run main.js"
 	},
 	"keywords": [],
 	"author": "",
@@ -19,6 +18,7 @@
 		"pngjs": "^7.0.0",
 		"qrcode": "^1.5.4",
 		"qrcode-terminal": "^0.12.0",
+		"redis": "^5.9.0",
 		"sharp": "^0.34.4",
 		"terminal-image": "^4.1.0"
 	}
