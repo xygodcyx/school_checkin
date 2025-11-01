@@ -2,11 +2,13 @@
 	"name": "school_checkin",
 	"version": "1.0.0",
 	"description": "获取wx_code:\r https://lp.open.weixin.qq.com/connect/l/qrconnect?uuid=021a8ujs2zXWZv3S&last=404",
-	"main": "main.js",
+	"main": "src/main.ts",
 	"type": "module",
 	"scripts": {
-		"start": "bun run main.js",
-		"checkin": "node main.js"
+		"start": "bun run src/main.ts",
+		"checkin": "bun run src/main.ts",
+		"build": "bun build src/main.ts --outdir dist --target bun",
+		"dev": "bun --watch src/main.ts"
 	},
 	"keywords": [],
 	"author": "",
@@ -22,5 +24,12 @@
 		"redis": "^5.9.0",
 		"sharp": "^0.34.4",
 		"terminal-image": "^4.1.0"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"@types/node": "^20.0.0",
+		"@types/nodemailer": "^6.4.14",
+		"@types/qrcode-terminal": "^0.12.6",
+		"typescript": "^5.3.3"
 	}
 }

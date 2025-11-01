@@ -1,9 +1,15 @@
 import fetch from 'node-fetch'
 
+interface RequestOptions {
+  method?: string
+  headers?: Record<string, string>
+  body?: string | object
+}
+
 // ==================== 通用请求封装 ====================
-export async function request(url, options = {}, token = null) {
-    console.log(token)
-  const defaultHeaders = {
+export async function request(url: string, options: RequestOptions = {}, token: string | null = null): Promise<any> {
+  console.log(token)
+  const defaultHeaders: Record<string, string> = {
     'content-type': 'application/json',
     accept: 'application/json, text/plain, */*',
     origin: 'https://i.jielong.com',
@@ -37,3 +43,4 @@ export async function request(url, options = {}, token = null) {
     return text
   }
 }
+

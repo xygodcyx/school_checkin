@@ -13,6 +13,7 @@
 ## 🛠️ 环境要求
 
 - [Bun](https://bun.sh/) (版本 1.2.x 或更高)
+- TypeScript 支持
 - Redis 数据库实例
 - SMTP 服务器用于邮件通知（可选）
 - 微信账号用于认证
@@ -50,10 +51,12 @@ TO_EMAIL=recipient@example.com
 ```
 
 ### 必需配置
+- `NAME`: 您的姓名（用于签到签名）
 - `REDIS_TOKEN`: Redis 数据库密码
 - `REDIS_ADDR`: Redis 实例地址，格式为 `host:port`
 
 ### 可选配置
+- `APPID`: 微信应用 ID
 - `SMTP_HOST`: SMTP 服务器地址，用于发送邮件通知
 - `SMTP_PORT`: SMTP 服务器端口（通常 SSL 为 465）
 - `SMTP_USER`: SMTP 用户名（邮箱地址）
@@ -67,19 +70,19 @@ TO_EMAIL=recipient@example.com
 手动运行签到流程：
 
 ```bash
-bun run main.js
+bun run start
 ```
 
 或
 
 ```bash
-bun main.js
+bun run src/main.ts
 ```
 
-### 使用启动脚本
+### 开发模式
 
 ```bash
-bun run start
+bun run dev
 ```
 
 ### 自动执行
@@ -88,7 +91,7 @@ bun run start
 
 ```bash
 # 示例 cron 任务，每天早上 8:00 AM 运行
-0 8 * * * cd /path/to/school_checkin && bun run main.js
+0 8 * * * cd /path/to/school_checkin && bun run start
 ```
 
 ## 🔍 工作原理
@@ -110,17 +113,19 @@ bun run start
 
 ```
 school_checkin/
-├── main.js                 # 主应用入口点
+├── src/
+│   ├── main.ts             # 主应用入口点
+│   └── lib/
+│       ├── checkin-utils.ts    # 签到相关函数
+│       ├── email-utils.ts      # 邮件通知工具
+│       ├── qrcode-utils.ts     # 二维码生成工具
+│       ├── request.ts          # HTTP 请求工具
+│       ├── token-info.ts       # 令牌管理和认证
+│       └── wechat-utils.ts     # 微信 API 工具
 ├── package.json            # 项目依赖和脚本
+├── tsconfig.json           # TypeScript 配置
 ├── bun.lock                # Bun 锁定文件
 ├── .env                    # 环境变量（未提交）
-├── lib/
-│   ├── checkin-utils.js    # 签到相关函数
-│   ├── email-utils.js      # 邮件通知工具
-│   ├── qrcode-utils.js     # 二维码生成工具
-│   ├── request.js          # HTTP 请求工具
-│   ├── token-info.js       # 令牌管理和认证
-│   └── wechat-utils.js     # 微信 API 工具
 └── README.md               # 此文件
 ```
 
@@ -128,10 +133,10 @@ school_checkin/
 
 ### 更改签到位置
 
-修改 `lib/checkin-utils.js` 中的 `DEFAULT_LOCATION`：
+修改 `src/lib/checkin-utils.ts` 中的 `DEFAULT_LOCATION`：
 
-```javascript
-const DEFAULT_LOCATION = {
+```typescript
+const DEFAULT_LOCATION: Location = {
   latitude: YOUR_LATITUDE,
   longitude: YOUR_LONGITUDE,
 }
@@ -139,18 +144,18 @@ const DEFAULT_LOCATION = {
 
 ### 更改签到主题
 
-修改 `lib/checkin-utils.js` 中的 `THREAD_ID` 以针对不同的签到主题：
+修改 `src/lib/checkin-utils.ts` 中的 `THREAD_ID` 以针对不同的签到主题：
 
-```javascript
+```typescript
 const THREAD_ID = YOUR_THREAD_ID
 ```
 
 ### 自定义签名
 
-可以通过在 `main.js` 中修改 `submitCheckIn` 调用的 `signature` 参数来自定义签名：
+可以通过设置环境变量 `NAME` 来自定义签名，或者在 `src/main.ts` 中修改：
 
-```javascript
-const result = await submitCheckIn(token_info.token, '您的姓名')
+```typescript
+const result = await submitCheckIn(token_info.token!, NAME)
 ```
 
 ## 🔐 安全性
@@ -181,8 +186,8 @@ const result = await submitCheckIn(token_info.token, '您的姓名')
 
 添加以下行以查看更详细的日志：
 
-```javascript
-// 在 main.js 或相关文件中添加调试
+```typescript
+// 在 src/main.ts 或相关文件中添加调试
 console.log("调试信息:", variable_to_debug);
 ```
 
