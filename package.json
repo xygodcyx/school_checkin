@@ -5,7 +5,7 @@
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
-		"start": "node src/main.js"
+		"start": "bun run main.js"
 	},
 	"keywords": [],
 	"author": "",
