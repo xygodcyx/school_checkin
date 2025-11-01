@@ -5,7 +5,8 @@
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
-		"start": "bun run main.js"
+		"start": "bun run main.js",
+		"checkin": "node main.js"
 	},
 	"keywords": [],
 	"author": "",

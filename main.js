@@ -1,9 +1,10 @@
 #!/usr/bin/env node
+import 'dotenv/config'
 import TokenInfo from './lib/token-info.js'
 import { getCheckInInfo, submitCheckIn } from './lib/checkin-utils.js'
 import { sendCheckinResult } from './lib/email-utils.js'
 
-NAME = process.env.NAME
+const NAME = process.env.NAME
 
 if (!NAME) {
   throw new Error('❌ 请设置环境变量 NAME 为您的姓名')

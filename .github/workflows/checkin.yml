@@ -3,7 +3,7 @@ name: WeChat Daily Checkin
 on:
   # 每天北京时间 19 点自动运行
   schedule:
-    - cron: '1 11 * * *'
+    - cron: '0 11 * * *'
   workflow_dispatch:
 
 permissions:
@@ -43,16 +43,14 @@ jobs:
       # 运行 WeChat 签到脚本
       - name: Run WeChat checkin script
         env:
+          NAME: ${{ secrets.NAME }}
           APPID: ${{ secrets.APPID }}
+          REDIS_TOKEN: ${{ secrets.REDIS_TOKEN }}
+          REDIS_ADDR: ${{ secrets.REDIS_ADDR }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
-          IS_GITHUB_ACTIONS: true
 
-        run: node index.js
-
-      #部署到github
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.PERSONAL_TOKEN }}
-          publish_dir: ./
+        run: node main.js
