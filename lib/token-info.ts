@@ -5,18 +5,30 @@ import { printAsciiQRCode } from "./qrcode-utils.js"
 import { sendEmailWithQRCode } from "./email-utils.js"
 import { request } from "./request.js"
 import fetch from "node-fetch"
+import fs from 'fs';
+
+import { getRootPath } from './path-utils';
+import path from "path"
+
+enum SAVE_MODE_ENUM {
+  REMOTE,
+  LOCAL
+}
 
 const REDIS_TOKEN = process.env.REDIS_TOKEN
 const REDIS_ADDR = process.env.REDIS_ADDR
+const SAVE_MODE = process.env.SAVE_MODE === "remote" ? SAVE_MODE_ENUM.REMOTE : SAVE_MODE_ENUM.LOCAL
 
-if (!REDIS_TOKEN || !REDIS_ADDR) {
+if (SAVE_MODE === SAVE_MODE_ENUM.REMOTE && (!REDIS_TOKEN || !REDIS_ADDR)) {
   throw new Error("❌ Redis 配置不完整")
 }
 
 const REDIS_URL = `rediss://default:${REDIS_TOKEN}@${REDIS_ADDR}`
+const LOCAL_PATH = `${path.join(getRootPath(), "config.json")}`
 const DEFAULT_TTL = 3600 * 24 * 3
 
 let clientPromise: Promise<any>
+
 
 function getClient() {
   if (!clientPromise) {
@@ -44,6 +56,16 @@ class TokenInfo {
     return new TokenInfo(token, expire)
   }
 
+  static async fromLocal(): Promise<TokenInfo> {
+    const isExist = await fs.promises.exists(LOCAL_PATH)
+    if (!isExist) {
+      return new TokenInfo("", 0)
+    }
+    const json = await fs.promises.readFile(LOCAL_PATH, "utf-8")
+    const { token, expire } = JSON.parse(json)
+    return new TokenInfo(token, expire)
+  }
+
   static async fetchTokenByWxCode(wxCode: string): Promise<TokenInfo> {
     const url = `https://i-api.jielong.com/api/User/OpenAuth?code=${wxCode}`
     const headers = {
@@ -61,9 +83,15 @@ class TokenInfo {
     return new TokenInfo(`Bearer ${tokenData}`, expire)
   }
 
-  async save(key: string = "token_info", ttl: number = DEFAULT_TTL): Promise<void> {
+  async saveWithRedis(key: string = "token_info", ttl: number = DEFAULT_TTL): Promise<void> {
     const client = await getClient()
     await client.set(key, JSON.stringify(this), { EX: ttl })
+    console.log("\n🎉 新 Token 已保存到 Redis")
+  }
+
+  async saveWithLocal() {
+    await fs.promises.writeFile(LOCAL_PATH, JSON.stringify(this))
+    console.log("\n🎉 新 Token 已保存到 本地")
   }
 
   isValid(): boolean {
@@ -71,7 +99,18 @@ class TokenInfo {
   }
 
   static async get_ensureLoggedIn(): Promise<TokenInfo> {
-    const tokenInfo = await TokenInfo.fromRedis()
+    let tokenInfo = null
+    switch (SAVE_MODE) {
+      case SAVE_MODE_ENUM.REMOTE:
+        tokenInfo = await TokenInfo.fromRedis()
+        break;
+      case SAVE_MODE_ENUM.LOCAL:
+        tokenInfo = await TokenInfo.fromLocal()
+        break;
+      default:
+        tokenInfo = await TokenInfo.fromLocal()
+        break;
+    }
     if (tokenInfo.isValid()) {
       console.log("✅ 检测到有效 Token，无需重新扫码。")
       return tokenInfo
@@ -116,8 +155,18 @@ class TokenInfo {
       // 成功拿到 wx_code，尝试换取 token
       try {
         const tokenInfo = await TokenInfo.fetchTokenByWxCode(wxCode)
-        await tokenInfo.save()
-        console.log("\n🎉 新 Token 已保存到 Redis")
+        switch (SAVE_MODE) {
+          case SAVE_MODE_ENUM.REMOTE:
+            await tokenInfo.saveWithRedis()
+            break;
+          case SAVE_MODE_ENUM.LOCAL:
+            await tokenInfo.saveWithLocal()
+            break;
+          default:
+            await tokenInfo.saveWithLocal()
+            break;
+        }
+
         return tokenInfo
       } catch (err: any) {
         console.error(
