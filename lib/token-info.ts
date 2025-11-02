@@ -49,6 +49,7 @@ class TokenInfo {
   }
 
   static async fromRedis(key: string = "token_info"): Promise<TokenInfo> {
+    console.log("从Redis获取Token...")
     const client = await getClient()
     const json = await client.get(key)
     if (!json) return new TokenInfo()
@@ -57,6 +58,7 @@ class TokenInfo {
   }
 
   static async fromLocal(): Promise<TokenInfo> {
+    console.log("从Local获取Token...")
     const isExist = await fs.promises.exists(LOCAL_PATH)
     if (!isExist) {
       return new TokenInfo("", 0)
