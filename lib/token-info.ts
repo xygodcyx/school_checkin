@@ -14,7 +14,7 @@ if (!REDIS_TOKEN || !REDIS_ADDR) {
 }
 
 const REDIS_URL = `rediss://default:${REDIS_TOKEN}@${REDIS_ADDR}`
-const DEFAULT_TTL = 3600
+const DEFAULT_TTL = 3600 * 24 * 3
 
 let clientPromise: Promise<any>
 
