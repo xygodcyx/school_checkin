@@ -8,7 +8,7 @@ interface RequestOptions {
 
 // ==================== 通用请求封装 ====================
 export async function request(url: string, options: RequestOptions = {}, token: string | null = null): Promise<any> {
-  console.log(token)
+  console.log(`token: ${token}`)
   const defaultHeaders: Record<string, string> = {
     'content-type': 'application/json',
     accept: 'application/json, text/plain, */*',

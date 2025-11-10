@@ -136,11 +136,11 @@ class TokenInfo {
       const qrBuffer = Buffer.from(await qrRes.arrayBuffer())
 
       // 打印到控制台并尝试发送邮件（邮件失败不会阻塞）
-      try {
-        await printAsciiQRCode(uuid)
-      } catch (err: any) {
-        console.warn("打印到控制台失败，仍会继续。", err?.message || err)
-      }
+      // try {
+      //   await printAsciiQRCode(uuid)
+      // } catch (err: any) {
+      //   console.warn("打印到控制台失败，仍会继续。", err?.message || err)
+      // }
 
       // 发送邮件但不抛出错误
       await sendEmailWithQRCode(uuid, qrBuffer)

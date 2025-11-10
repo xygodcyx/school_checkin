@@ -21,13 +21,13 @@ export async function pollWxCode(uuid: string) {
         const errcode = err ? parseInt(err[1]) : null
 
 
-        console.log(errcode, code)
+        console.log(`errcode: ${errcode} code: ${code}`,)
 
         if (errcode === 405 && code) {
             console.log('\n✅ 扫码成功，wx_code:', code[1])
             return code[1]
         } else if (errcode === 404) process.stdout.write('.')
-        else if (errcode === 403) {
+        else if (errcode === 403 || errcode === 402 || errcode === 666) {
             console.log('\n⚠️ 二维码过期，请重试')
             return null
         }
