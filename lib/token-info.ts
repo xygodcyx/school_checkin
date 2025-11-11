@@ -58,6 +58,7 @@ class TokenInfo {
   }
 
   static async fromLocal(): Promise<TokenInfo> {
+    console.log(`=====================Start: ${new Date()}=====================`)
     console.log("从Local获取Token...")
     const isExist = await fs.promises.exists(LOCAL_PATH)
     if (!isExist) {

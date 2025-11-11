@@ -22,6 +22,8 @@ try {
 
   // 发送签到结果邮件（可选，失败不阻塞）
   await sendCheckinResult(result)
+
+  console.log(`=====================End: ${new Date()}=====================`)
 } catch (err: any) {
   console.error('❌ 运行出错:', err.message || err)
   process.exit(1)
