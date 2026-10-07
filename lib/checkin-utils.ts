@@ -1,6 +1,6 @@
 import { request } from './request.js'
 
-const THREAD_ID = 163231508
+const THREAD_ID = Number(process.env.THREAD_ID || 183058660)
 
 interface Location {
   latitude: number
@@ -43,9 +43,11 @@ export async function submitCheckIn(
     RecordValues: [
       {
         FieldId: 1,
-        Values: [],
-        Texts: [],
-        HasValue: false,
+        Values: [
+          JSON.stringify(location || DEFAULT_LOCATION),
+        ],
+        Texts: ['上饶市信州区•上饶师范学院'],
+        HasValue: true,
       },
       {
         FieldId: 2,

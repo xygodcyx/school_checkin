@@ -29,7 +29,6 @@ const DEFAULT_TTL = 3600 * 24 * 3
 
 let clientPromise: Promise<any>
 
-
 function getClient() {
   if (!clientPromise) {
     clientPromise = createClient({ url: REDIS_URL })
@@ -114,6 +113,7 @@ class TokenInfo {
         tokenInfo = await TokenInfo.fromLocal()
         break;
     }
+
     if (tokenInfo.isValid()) {
       console.log("✅ 检测到有效 Token，无需重新扫码。")
       return tokenInfo
