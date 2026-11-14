@@ -181,18 +181,17 @@ bun run typecheck
 
 项目内置 `ecosystem.config.cjs`，会自动定位 Bun，并固定单实例运行（避免重复签到和重复发邮件）。PM2 通过 `scripts/pm2-run.sh` 以 Bash 包装脚本 `exec` 到 Bun，不依赖 PM2 的 Bun 解释器，因此兼容 PM2 5/6/7，不会出现 `ProcessContainerForkBun.js` 缺失问题。
 
-安装 PM2：
+PM2 已加入项目的 `dependencies`。执行 `bun install` 后，`bun run pm2:*` 会自动使用 `node_modules/.bin/pm2`，**不需要全局安装 PM2**。
+
+```bash
+bun install
+bun run pm2:start
+```
+
+如果你也想直接在终端使用 `pm2` 命令，可以额外全局安装：
 
 ```bash
 npm install -g pm2
-# 或者
-bun add -g pm2
-```
-
-启动：
-
-```bash
-bun run pm2:start
 ```
 
 常用命令：
@@ -222,7 +221,7 @@ BUN_PATH=/home/你的用户名/.bun/bin/bun bun run pm2:start
 设置开机自启：
 
 ```bash
-pm2 startup
+bun run pm2:startup
 # 按提示执行输出的 sudo 命令
 bun run pm2:save
 ```
@@ -232,10 +231,19 @@ bun run pm2:save
 如果旧进程仍在重启循环，先删除再重新启动：
 
 ```bash
-pm2 delete school-checkin
+bunx pm2 delete school-checkin
 bun run pm2:start
 bun run pm2:logs
 ```
+
+> 如果之前是用 root 用户的全局 PM2 启动过旧进程，请先切到 root 停止旧实例，避免新旧两个进程同时运行：
+>
+> ```bash
+> sudo -i
+> pm2 delete school-checkin
+> pm2 save
+> exit
+> ```
 
 如果日志里出现：
 
