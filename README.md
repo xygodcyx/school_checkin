@@ -179,7 +179,7 @@ bun run typecheck
 
 ### 使用 PM2 守护进程
 
-项目内置 `ecosystem.config.cjs`，会自动定位 Bun，并固定单实例运行（避免重复签到和重复发邮件）。
+项目内置 `ecosystem.config.cjs`，会自动定位 Bun，并固定单实例运行（避免重复签到和重复发邮件）。PM2 通过 `scripts/pm2-run.sh` 以 Bash 包装脚本 `exec` 到 Bun，不依赖 PM2 的 Bun 解释器，因此兼容 PM2 5/6/7，不会出现 `ProcessContainerForkBun.js` 缺失问题。
 
 安装 PM2：
 
@@ -228,6 +228,36 @@ bun run pm2:save
 ```
 
 > 本服务必须保持单实例运行。不要使用 `pm2 start ... -i max`，否则可能重复签到、重复发送邮件。
+
+如果旧进程仍在重启循环，先删除再重新启动：
+
+```bash
+pm2 delete school-checkin
+bun run pm2:start
+bun run pm2:logs
+```
+
+如果日志里出现：
+
+```text
+Module not found ".../pm2/lib/ProcessContainerForkBun.js"
+```
+
+说明服务器上的 PM2 版本较旧，不支持 Bun 解释器。项目的 `ecosystem.config.cjs` 已改为通过 Bash 包装脚本启动 Bun，不需要升级 PM2。更新代码后执行：
+
+```bash
+pm2 delete school-checkin
+pm2 flush school-checkin
+pm2 start ecosystem.config.cjs
+pm2 logs school-checkin
+```
+
+如果仍然出现该错误，确认 PM2 加载的是项目根目录下最新的 `ecosystem.config.cjs`，并且其中包含：
+
+```js
+script: path.join(appRoot, 'scripts', 'pm2-run.sh'),
+interpreter: '/bin/bash',
+```
 
 启动后会看到：
 
@@ -394,6 +424,8 @@ school_checkin/
 │   ├── request.ts            # HTTP 请求封装
 │   ├── wechat-utils.ts       # 微信 UUID 获取与扫码轮询
 │   └── path-utils.ts         # 项目根目录定位
+├── scripts/
+│   └── pm2-run.sh            # PM2 启动包装脚本（exec 到 Bun）
 ├── data/state.json           # 运行状态（自动生成，已忽略）
 ├── logs/                     # PM2 日志（自动生成，已忽略）
 ├── config.json               # 本地 Token（自动生成，已忽略）

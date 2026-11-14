@@ -43,16 +43,18 @@ function resolveBun() {
 }
 
 const bun = resolveBun()
-const bunBinDir = path.dirname(bun)
+const bunBinDir = path.isAbsolute(bun) ? path.dirname(bun) : ''
 const runtimePath = [bunBinDir, process.env.PATH].filter(Boolean).join(path.delimiter)
+const bash = fs.existsSync('/bin/bash') ? '/bin/bash' : 'bash'
 
 module.exports = {
   apps: [
     {
       name: 'school-checkin',
       cwd: appRoot,
-      script: path.join(appRoot, 'src', 'main.ts'),
-      interpreter: bun,
+      // 通过 bash 包装脚本 exec 到 Bun，避免旧版 PM2 的 ProcessContainerForkBun.js 兼容问题。
+      script: path.join(appRoot, 'scripts', 'pm2-run.sh'),
+      interpreter: bash,
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
@@ -69,6 +71,7 @@ module.exports = {
       error_file: path.join(logDir, 'error.log'),
       env: {
         NODE_ENV: 'production',
+        BUN_BIN: bun,
         PATH: runtimePath,
       },
     },
