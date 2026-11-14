@@ -5,4 +5,5 @@ qrcode.png
 config.json
 data/
 dist/
+logs/
 *.log

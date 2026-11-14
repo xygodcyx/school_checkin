@@ -177,6 +177,58 @@ bun run dev
 bun run typecheck
 ```
 
+### 使用 PM2 守护进程
+
+项目内置 `ecosystem.config.cjs`，会自动定位 Bun，并固定单实例运行（避免重复签到和重复发邮件）。
+
+安装 PM2：
+
+```bash
+npm install -g pm2
+# 或者
+bun add -g pm2
+```
+
+启动：
+
+```bash
+bun run pm2:start
+```
+
+常用命令：
+
+```bash
+bun run pm2:status     # 查看状态
+bun run pm2:logs       # 实时日志
+bun run pm2:restart    # 修改 .env 后重启并加载新环境
+bun run pm2:stop       # 停止
+bun run pm2:delete     # 删除 PM2 进程记录
+bun run pm2:flush      # 清空日志
+```
+
+PM2 日志写入：
+
+```text
+logs/out.log
+logs/error.log
+```
+
+如果 PM2 提示找不到 Bun，可以在启动命令前指定：
+
+```bash
+BUN_PATH=/home/你的用户名/.bun/bin/bun bun run pm2:start
+```
+
+设置开机自启：
+
+```bash
+pm2 startup
+# 按提示执行输出的 sudo 命令
+bun run pm2:save
+```
+
+> 本服务必须保持单实例运行。不要使用 `pm2 start ... -i max`，否则可能重复签到、重复发送邮件。
+
 启动后会看到：
 
 ```text
@@ -343,7 +395,9 @@ school_checkin/
 │   ├── wechat-utils.ts       # 微信 UUID 获取与扫码轮询
 │   └── path-utils.ts         # 项目根目录定位
 ├── data/state.json           # 运行状态（自动生成，已忽略）
+├── logs/                     # PM2 日志（自动生成，已忽略）
 ├── config.json               # 本地 Token（自动生成，已忽略）
+├── ecosystem.config.cjs      # PM2 守护配置
 ├── .env                      # 环境变量（已忽略）
 ├── .env.example
 ├── package.json

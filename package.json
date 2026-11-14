@@ -8,7 +8,15 @@
     "start": "bun run src/main.ts",
     "dev": "bun --watch src/main.ts",
     "build": "bun build src/main.ts --outdir dist --target bun",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:restart": "pm2 restart school-checkin --update-env",
+    "pm2:stop": "pm2 stop school-checkin",
+    "pm2:delete": "pm2 delete school-checkin",
+    "pm2:status": "pm2 status school-checkin",
+    "pm2:logs": "pm2 logs school-checkin",
+    "pm2:save": "pm2 save",
+    "pm2:flush": "pm2 flush school-checkin"
   },
   "keywords": [
     "checkin",
