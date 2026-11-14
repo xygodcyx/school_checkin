@@ -1,21 +1,34 @@
-import sharp from 'sharp'
-import terminalImage from 'terminal-image'
 import fetch from 'node-fetch'
+import sharp from 'sharp'
 
-export async function printAsciiQRCode(uuid: string): Promise<void> {
-  const qrUrl = `https://open.weixin.qq.com/connect/qrcode/${uuid}`
-  const response = await fetch(qrUrl)
-  const arrayBuffer = await response.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
-  
-  const resized = await sharp(buffer as any)
-    .resize({ width: 200 })
-    .toBuffer()
-    
-  console.log('\n请使用微信扫描下方二维码：\n')
-  console.log(
-    await terminalImage.buffer(resized as any, { width: 200 })
-  )
-  console.log('\n（提示：此二维码为登录二维码）')
+export interface QrCodeImage {
+  buffer: Buffer
+  contentType: 'image/png'
 }
 
+export async function fetchQrCodeImage(uuid: string): Promise<QrCodeImage> {
+  const qrUrl = `https://open.weixin.qq.com/connect/qrcode/${uuid}`
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 20_000)
+
+  try {
+    const response = await fetch(qrUrl, {
+      headers: {
+        'user-agent':
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/16A366 MicroMessenger/8.0.40 NetType/WIFI Language/zh_CN',
+      },
+      signal: controller.signal as any,
+    })
+
+    if (!response.ok) {
+      throw new Error(`获取微信二维码失败：HTTP ${response.status}`)
+    }
+
+    const raw = Buffer.from(await response.arrayBuffer())
+    // 微信有时返回 JPEG，统一转换为 PNG，避免邮件客户端对二维码附件类型兼容性差。
+    const buffer = await sharp(raw).png().toBuffer()
+    return { buffer, contentType: 'image/png' }
+  } finally {
+    clearTimeout(timer)
+  }
+}

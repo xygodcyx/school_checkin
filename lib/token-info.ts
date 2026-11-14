@@ -1,187 +1,181 @@
-// token-info.ts
-import { createClient } from "redis"
-import { fetchUUID, pollWxCode } from "./wechat-utils.js"
-import { printAsciiQRCode } from "./qrcode-utils.js"
-import { sendEmailWithQRCode } from "./email-utils.js"
-import { request } from "./request.js"
-import fetch from "node-fetch"
-import fs from 'fs';
+import fs from 'fs/promises'
+import path from 'path'
+import { createClient } from 'redis'
+import { config } from './config.js'
+import { getRootPath } from './path-utils.js'
+import { requestMeta } from './request.js'
 
-import { getRootPath } from './path-utils';
-import path from "path"
+const LOCAL_PATH = path.join(getRootPath(), 'config.json')
+const REDIS_KEY = 'token_info'
 
-enum SAVE_MODE_ENUM {
-  REMOTE,
-  LOCAL
-}
+let clientPromise: Promise<any> | null = null
 
-const REDIS_TOKEN = process.env.REDIS_TOKEN
-const REDIS_ADDR = process.env.REDIS_ADDR
-const SAVE_MODE = process.env.SAVE_MODE === "remote" ? SAVE_MODE_ENUM.REMOTE : SAVE_MODE_ENUM.LOCAL
-
-if (SAVE_MODE === SAVE_MODE_ENUM.REMOTE && (!REDIS_TOKEN || !REDIS_ADDR)) {
-  throw new Error("❌ Redis 配置不完整")
-}
-
-const REDIS_URL = `rediss://default:${REDIS_TOKEN}@${REDIS_ADDR}`
-const LOCAL_PATH = `${path.join(getRootPath(), "config.json")}`
-const DEFAULT_TTL = 3600 * 24 * 3
-
-let clientPromise: Promise<any>
-
-function getClient() {
+function getRedisClient(): Promise<any> {
   if (!clientPromise) {
-    clientPromise = createClient({ url: REDIS_URL })
-      .on("error", (err: Error) => console.error("[Redis] Error", err))
+    const url = `rediss://default:${encodeURIComponent(config.redis.token)}@${config.redis.addr}`
+    const client = createClient({ url })
+    client.on('error', (err: Error) => console.error('[Redis] Error', err))
+
+    clientPromise = client
       .connect()
+      .then(() => client)
+      .catch((err: Error) => {
+        clientPromise = null
+        throw err
+      })
   }
+
   return clientPromise
 }
 
-class TokenInfo {
+export async function closeTokenStore(): Promise<void> {
+  if (!clientPromise) return
+
+  try {
+    const client = await clientPromise
+    await client.quit()
+  } catch {
+    // 忽略关闭连接时的异常
+  } finally {
+    clientPromise = null
+  }
+}
+
+function normalizeExpire(value: unknown): number | null {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) return null
+  // 兼容秒级时间戳
+  return numeric < 1_000_000_000_000 ? Math.round(numeric * 1000) : Math.round(numeric)
+}
+
+export class TokenInfo {
   token: string | null
   expire: number | null
 
   constructor(token: string | null = null, expire: number | null = null) {
-    this.token = token
-    this.expire = expire
+    this.token = token || null
+    this.expire = normalizeExpire(expire)
   }
 
-  static async fromRedis(key: string = "token_info"): Promise<TokenInfo> {
-    console.log("从Redis获取Token...")
-    const client = await getClient()
-    const json = await client.get(key)
+  static async load(): Promise<TokenInfo> {
+    return config.saveMode === 'remote' ? TokenInfo.fromRedis() : TokenInfo.fromLocal()
+  }
+
+  static async fromRedis(): Promise<TokenInfo> {
+    const client = await getRedisClient()
+    const json = await client.get(REDIS_KEY)
     if (!json) return new TokenInfo()
-    const { token, expire } = JSON.parse(json)
-    return new TokenInfo(token, expire)
+
+    try {
+      const { token, expire } = JSON.parse(json)
+      return new TokenInfo(token, expire)
+    } catch {
+      console.warn('⚠️ Redis 中的 Token 数据格式异常，已忽略。')
+      return new TokenInfo()
+    }
   }
 
   static async fromLocal(): Promise<TokenInfo> {
-    console.log(`=====================Start: ${new Date()}=====================`)
-    console.log("从Local获取Token...")
-    const isExist = await fs.promises.exists(LOCAL_PATH)
-    if (!isExist) {
-      return new TokenInfo("", 0)
+    try {
+      const json = await fs.readFile(LOCAL_PATH, 'utf-8')
+      const { token, expire } = JSON.parse(json)
+      return new TokenInfo(token, expire)
+    } catch (err: any) {
+      if (err?.code !== 'ENOENT') {
+        console.warn(`⚠️ 读取本地 Token 失败：${err?.message || err}`)
+      }
+      return new TokenInfo()
     }
-    const json = await fs.promises.readFile(LOCAL_PATH, "utf-8")
-    const { token, expire } = JSON.parse(json)
-    return new TokenInfo(token, expire)
   }
 
   static async fetchTokenByWxCode(wxCode: string): Promise<TokenInfo> {
     const url = `https://i-api.jielong.com/api/User/OpenAuth?code=${wxCode}`
-    const headers = {
-      "content-type": "application/x-www-form-urlencoded",
-    }
-    const json = await request(url, {
-      method: "POST",
-      headers,
-      body: "",
+    const result = await requestMeta(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      body: '',
     })
-    const tokenData = json?.Data?.Token
-    const expire = json?.Data?.Expire
-    if (!tokenData || !expire) throw new Error("❌ 获取 Token 失败")
-    console.log("✅ 登录成功，Token 获取完毕")
+
+    if (!result.ok) {
+      throw new Error(`换取 Token 失败：HTTP ${result.status}`)
+    }
+
+    const tokenData = result.data?.Data?.Token
+    const expire = result.data?.Data?.Expire
+    if (!tokenData || !expire) {
+      throw new Error('❌ 获取 Token 失败：响应中没有 Token 或 Expire')
+    }
+
     return new TokenInfo(`Bearer ${tokenData}`, expire)
   }
 
-  async saveWithRedis(key: string = "token_info", ttl: number = DEFAULT_TTL): Promise<void> {
-    const client = await getClient()
-    await client.set(key, JSON.stringify(this), { EX: ttl })
-    console.log("\n🎉 新 Token 已保存到 Redis")
+  async save(): Promise<void> {
+    if (config.saveMode === 'remote') {
+      await this.saveWithRedis()
+    } else {
+      await this.saveWithLocal()
+    }
   }
 
-  async saveWithLocal() {
-    await fs.promises.writeFile(LOCAL_PATH, JSON.stringify(this))
-    console.log("\n🎉 新 Token 已保存到 本地")
+  async saveWithRedis(): Promise<void> {
+    const client = await getRedisClient()
+    const ttlSeconds = this.expire
+      ? Math.max(60, Math.ceil((this.expire - Date.now()) / 1000))
+      : config.token.defaultTtlHours * 3600
+
+    await client.set(REDIS_KEY, JSON.stringify({ token: this.token, expire: this.expire }), {
+      EX: ttlSeconds,
+    })
+    console.log('🎉 新 Token 已保存到 Redis')
   }
 
-  isValid(): boolean {
-    return !!(this.token && this.expire && Date.now() < this.expire)
+  async saveWithLocal(): Promise<void> {
+    await fs.writeFile(LOCAL_PATH, JSON.stringify({ token: this.token, expire: this.expire }), 'utf-8')
+    console.log('🎉 新 Token 已保存到本地 config.json')
   }
 
-  static async get_ensureLoggedIn(): Promise<TokenInfo> {
-    let tokenInfo = null
-    switch (SAVE_MODE) {
-      case SAVE_MODE_ENUM.REMOTE:
-        tokenInfo = await TokenInfo.fromRedis()
-        break;
-      case SAVE_MODE_ENUM.LOCAL:
-        tokenInfo = await TokenInfo.fromLocal()
-        break;
-      default:
-        tokenInfo = await TokenInfo.fromLocal()
-        break;
-    }
+  isValid(now: number = Date.now()): boolean {
+    return Boolean(this.token && this.expire && now < this.expire)
+  }
 
-    if (tokenInfo.isValid()) {
-      console.log("✅ 检测到有效 Token，无需重新扫码。")
-      return tokenInfo
-    }
+  remainingMs(now: number = Date.now()): number {
+    if (!this.expire) return 0
+    return Math.max(0, this.expire - now)
+  }
 
-    while (true) {
-      console.log("⚠️ Token 不存在或已过期，生成新的二维码并等待扫码...")
+  /**
+   * 从 JWT 中读取 iat/exp，推断服务端签发的 Token 有效期。
+   * 该值只用于在用户登录前估算“登录后可持续到什么时候”。
+   */
+  getTtlMs(): number | null {
+    if (!this.token) return null
 
-      let uuid: string
-      try {
-        uuid = await fetchUUID()
-      } catch (err: any) {
-        console.error(`获取 UUID 失败，稍后重试：${err?.message || err}`)
-        await new Promise((r) => setTimeout(r, 2000))
-        continue
+    try {
+      const raw = this.token.replace(/^Bearer\s+/i, '')
+      const payloadPart = raw.split('.')[1]
+      if (!payloadPart) return null
+
+      const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString('utf-8')) as {
+        iat?: number
+        exp?: number
       }
 
-      const qrRes = await fetch(
-        `https://open.weixin.qq.com/connect/qrcode/${uuid}`
-      )
-      const qrBuffer = Buffer.from(await qrRes.arrayBuffer())
-
-      // 打印到控制台并尝试发送邮件（邮件失败不会阻塞）
-      // try {
-      //   await printAsciiQRCode(uuid)
-      // } catch (err: any) {
-      //   console.warn("打印到控制台失败，仍会继续。", err?.message || err)
-      // }
-
-      // 发送邮件但不抛出错误
-      await sendEmailWithQRCode(uuid, qrBuffer)
-
-      // 等待扫码（阻塞直到扫码成功或二维码过期）
-      const wxCode = await pollWxCode(uuid)
-      if (!wxCode) {
-        // 二维码过期，短暂等待并重试获取新的二维码
-        console.log("二维码过期，准备重新生成新的二维码...")
-        await new Promise((r) => setTimeout(r, 2000))
-        continue
+      if (typeof payload.iat === 'number' && typeof payload.exp === 'number') {
+        return Math.max(0, (payload.exp - payload.iat) * 1000)
       }
-
-      // 成功拿到 wx_code，尝试换取 token
-      try {
-        const tokenInfo = await TokenInfo.fetchTokenByWxCode(wxCode)
-        switch (SAVE_MODE) {
-          case SAVE_MODE_ENUM.REMOTE:
-            await tokenInfo.saveWithRedis()
-            break;
-          case SAVE_MODE_ENUM.LOCAL:
-            await tokenInfo.saveWithLocal()
-            break;
-          default:
-            await tokenInfo.saveWithLocal()
-            break;
-        }
-
-        return tokenInfo
-      } catch (err: any) {
-        console.error(
-          "用 wx_code 换取 Token 失败，稍后重试：",
-          err?.message || err
-        )
-        await new Promise((r) => setTimeout(r, 2000))
-        // 不直接退出，继续循环重新生成二维码
-      }
+    } catch {
+      // 解析失败时使用默认有效期
     }
+
+    return null
+  }
+
+  /** 如果现在重新登录，Token 预计会持续到的具体时间 */
+  estimateNextExpire(now: number = Date.now()): number {
+    return now + (this.getTtlMs() || config.token.defaultTtlHours * 60 * 60 * 1000)
   }
 }
 
-export default TokenInfo
-
+export { LOCAL_PATH as TOKEN_LOCAL_PATH, REDIS_KEY as TOKEN_REDIS_KEY }

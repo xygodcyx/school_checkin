@@ -3,3 +3,6 @@
 qrcode.png
 .config
 config.json
+data/
+dist/
+*.log

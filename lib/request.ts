@@ -1,14 +1,25 @@
 import fetch from 'node-fetch'
 
-interface RequestOptions {
+export interface RequestOptions {
   method?: string
   headers?: Record<string, string>
   body?: string | object
+  timeoutMs?: number
+}
+
+export interface RequestMeta {
+  ok: boolean
+  status: number
+  data: any
+  text: string
 }
 
 // ==================== 通用请求封装 ====================
-export async function request(url: string, options: RequestOptions = {}, token: string | null = null): Promise<any> {
-  console.log(`token: ${token}`)
+export async function requestMeta(
+  url: string,
+  options: RequestOptions = {},
+  token: string | null = null,
+): Promise<RequestMeta> {
   const defaultHeaders: Record<string, string> = {
     'content-type': 'application/json',
     accept: 'application/json, text/plain, */*',
@@ -23,24 +34,44 @@ export async function request(url: string, options: RequestOptions = {}, token: 
 
   if (token) defaultHeaders['Authorization'] = token
 
-  const res = await fetch(url, {
-    method: options.method || 'GET',
-    headers: {
-      ...defaultHeaders,
-      ...(options.headers || {}),
-    },
-    body: options.body
-      ? typeof options.body === 'string'
-        ? options.body
-        : JSON.stringify(options.body)
-      : undefined,
-  })
+  const controller = new AbortController()
+  const timeoutMs = options.timeoutMs || 20_000
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
 
-  const text = await res.text()
   try {
-    return JSON.parse(text)
-  } catch {
-    return text
+    const res = await fetch(url, {
+      method: options.method || 'GET',
+      headers: {
+        ...defaultHeaders,
+        ...(options.headers || {}),
+      },
+      body: options.body
+        ? typeof options.body === 'string'
+          ? options.body
+          : JSON.stringify(options.body)
+        : undefined,
+      signal: controller.signal as any,
+    })
+
+    const text = await res.text()
+    let data: any = text
+    try {
+      data = JSON.parse(text)
+    } catch {
+      // 保留原始文本
+    }
+
+    return { ok: res.ok, status: res.status, data, text }
+  } finally {
+    clearTimeout(timer)
   }
 }
 
+export async function request(
+  url: string,
+  options: RequestOptions = {},
+  token: string | null = null,
+): Promise<any> {
+  const result = await requestMeta(url, options, token)
+  return result.data
+}

@@ -1,52 +1,41 @@
-name: WeChat Daily Checkin
+name: Manual Server Check-in Trigger
 
+# 定时签到由常驻服务在每天 18:00（Asia/Shanghai）自动执行。
+# 该工作流仅用于手动触发服务器上的 Webhook，例如服务恢复后补签。
 on:
-  # 每天北京时间 19 点自动运行
-  schedule:
-    - cron: '0 11 * * *'
   workflow_dispatch:
-
-permissions:
-  contents: write
+    inputs:
+      force:
+        description: '强制重新签到（即使今天已成功）'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
-  checkin:
+  trigger:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-
-      # 安装 Bun
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      # 恢复依赖缓存
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        id: bun-cache
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lockb') }}
-          restore-keys: |
-            bun-${{ runner.os }}-
-
-      # 安装依赖
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      # 运行 WeChat 签到脚本
-      - name: Run WeChat checkin script
+      - name: Trigger check-in webhook
         env:
-          NAME: ${{ secrets.NAME }}
-          APPID: ${{ secrets.APPID }}
-          REDIS_TOKEN: ${{ secrets.REDIS_TOKEN }}
-          REDIS_ADDR: ${{ secrets.REDIS_ADDR }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+          SERVER_URL: ${{ secrets.SERVER_URL }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          if [ -z "$SERVER_URL" ]; then
+            echo "::error::请在仓库 Secrets 中配置 SERVER_URL"
+            exit 1
+          fi
 
-        run: bun run start
+          echo "触发签到：${SERVER_URL%/}/api/checkin"
+
+          if [ "$FORCE" = "true" ]; then
+            curl --fail --silent --show-error --max-time 60 --get \
+              --data-urlencode "token=${WEBHOOK_SECRET}" \
+              --data-urlencode "force=1" \
+              "${SERVER_URL%/}/api/checkin"
+          else
+            curl --fail --silent --show-error --max-time 60 --get \
+              --data-urlencode "token=${WEBHOOK_SECRET}" \
+              "${SERVER_URL%/}/api/checkin"
+          fi

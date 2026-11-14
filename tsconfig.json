@@ -20,12 +20,7 @@
   },
   "include": [
     "src/**/*",
-    "lib/lib",
-    "lib/checkin-utils.ts",
-    "lib/email-utils.ts",
-    "lib/qrcode-utils.ts",
-    "lib/request.ts",
-    "lib/token-info.ts"
+    "lib/**/*"
   ],
   "exclude": [
     "node_modules",

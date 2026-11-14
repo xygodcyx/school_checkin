@@ -1,54 +1,64 @@
 import { request } from './request.js'
 
 const APPID = process.env.APPID || 'wx4a23ae4b8f291087'
-const REDIRECT_URI =
-    'https%3A%2F%2Fi.jielong.com%2Flogin-callback'
+const REDIRECT_URI = 'https%3A%2F%2Fi.jielong.com%2Flogin-callback'
 
-export async function fetchUUID() {
-    const url = `https://open.weixin.qq.com/connect/qrconnect?appid=${APPID}&scope=snsapi_login&redirect_uri=${REDIRECT_URI}`
-    const html = await request(url, { method: 'GET' })
-    const match = html.match(/uuid=([a-zA-Z0-9_-]+)/)
-    if (!match) throw new Error('❌ 未能提取到 UUID')
-    return match[1]
-}
-export async function pollWxCode(uuid: string) {
-    const pollUrl = `https://lp.open.weixin.qq.com/connect/l/qrconnect?uuid=${uuid}&last=404`
-    process.stdout.write('⌛ 等待扫码')
-    while (true) {
-        const text = await request(pollUrl)
-        const err = text.match(/wx_errcode=(\d+)/)
-        const code = text.match(/wx_code='([^']+)'/)
-        const errcode = err ? parseInt(err[1]) : null
-
-
-        console.log(`errcode: ${errcode} code: ${code}`,)
-
-        if (errcode === 405 && code) {
-            console.log('\n✅ 扫码成功，wx_code:', code[1])
-            return code[1]
-        } else if (errcode === 404) process.stdout.write('.')
-        else if (errcode === 403 || errcode === 402 || errcode === 666) {
-            console.log('\n⚠️ 二维码过期，请重试')
-            return null
-        }
-        await new Promise(r => setTimeout(r, 1000))
-    }
+export function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-export async function fetchTokenByWxCode(wxCode: string) {
-    const url = `https://i-api.jielong.com/api/User/OpenAuth?code=${wxCode}`
-    const headers = {
-        'content-type': 'application/x-www-form-urlencoded',
+export async function fetchUUID(): Promise<string> {
+  const url = `https://open.weixin.qq.com/connect/qrconnect?appid=${APPID}&scope=snsapi_login&redirect_uri=${REDIRECT_URI}`
+  const html = await request(url, { method: 'GET' })
+  const match = typeof html === 'string' ? html.match(/uuid=([a-zA-Z0-9_-]+)/) : null
+  if (!match) throw new Error('❌ 未能从微信页面提取到 UUID')
+  return match[1]
+}
+
+/**
+ * 轮询微信扫码结果。
+ * - 返回 wx_code 表示扫码成功
+ * - 返回 null 表示二维码过期、被取消或轮询被中断
+ */
+export async function pollWxCode(
+  uuid: string,
+  isCancelled: () => boolean = () => false,
+): Promise<string | null> {
+  const pollUrl = `https://lp.open.weixin.qq.com/connect/l/qrconnect?uuid=${uuid}&last=404`
+
+  while (!isCancelled()) {
+    let text: any
+
+    try {
+      text = await request(pollUrl, { timeoutMs: 15_000 })
+    } catch (err: any) {
+      if (isCancelled()) return null
+      console.warn(`⚠️ 轮询扫码状态失败，稍后重试：${err?.message || err}`)
+      await sleep(2000)
+      continue
     }
-    const json = await request(url, {
-        method: 'POST',
-        headers,
-        body: '',
-    })
-    const tokenData = json?.Data?.Token
-    const expire = json?.Data?.Expire
-    if (!tokenData || !expire)
-        throw new Error('❌ 获取 Token 失败')
-    console.log('✅ 登录成功，Token 获取完毕')
-    return { token: `Bearer ${tokenData}`, expire }
+
+    if (typeof text !== 'string') {
+      await sleep(1000)
+      continue
+    }
+
+    const errMatch = text.match(/wx_errcode=(\d+)/)
+    const codeMatch = text.match(/wx_code='([^']+)'/)
+    const errcode = errMatch ? Number.parseInt(errMatch[1], 10) : null
+
+    if (errcode === 405 && codeMatch) {
+      console.log('✅ 微信扫码成功')
+      return codeMatch[1]
+    }
+
+    if (errcode === 403 || errcode === 402 || errcode === 666) {
+      console.log('⚠️ 微信二维码已过期')
+      return null
+    }
+
+    await sleep(1000)
+  }
+
+  return null
 }

@@ -1,86 +1,178 @@
-import path from 'path'
-import nodemailer from 'nodemailer'
-import fs from 'fs'
+import nodemailer, { type Transporter } from 'nodemailer'
+import { config } from './config.js'
+import {
+  buildCheckinResultEmail,
+  buildLoginQrEmail,
+  buildLoginRequiredEmail,
+  buildLoginSuccessEmail,
+  buildTokenExpiringEmail,
+  type EmailContent,
+} from './email-templates.js'
+import { actionUrl, qrPageUrl } from './urls.js'
+import type { LoginSource } from './login-manager.js'
 
-const SMTP_PORT = process.env.SMTP_PORT
-const SMTP_HOST = process.env.SMTP_HOST
-const SMTP_USER = process.env.SMTP_USER
-const SMTP_PASS = process.env.SMTP_PASS
-const TO_EMAIL = process.env.TO_EMAIL
-
-export let EMAIL_ENABLE = true
-
-if (!SMTP_USER || !SMTP_PASS || !TO_EMAIL) {
-  console.log('⚠️ 邮件发送配置不完整，邮件功能已禁用。请设置 SMTP_USER, SMTP_PASS, TO_EMAIL 环境变量以启用邮件功能。')
-  EMAIL_ENABLE = false
+interface MailAttachment {
+  filename: string
+  content: Buffer
+  contentType: string
+  cid: string
 }
 
-export function createMailSender() {
-  const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: parseInt(SMTP_PORT || '465'),
-    secure: true,
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS,
-    },
-  })
+let transporter: Transporter | null = null
+
+export function isEmailEnabled(): boolean {
+  return config.email.enabled
+}
+
+function getTransporter(): Transporter {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: config.email.host,
+      port: config.email.port,
+      secure: config.email.secure,
+      auth: {
+        user: config.email.user,
+        pass: config.email.pass,
+      },
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 30_000,
+    })
+  }
+
   return transporter
 }
 
-export async function sendEmailWithQRCode(uuid: string, qrBuffer: Buffer): Promise<void> {
-  if (!EMAIL_ENABLE) {
-    return
+async function sendMail(content: EmailContent, attachments: MailAttachment[] = []): Promise<boolean> {
+  if (!config.email.enabled) {
+    console.warn(`⚠️ 邮件功能未启用，跳过发送：${content.subject}`)
+    return false
   }
-  console.log('📧 正在发送二维码邮件...')
+
   try {
-    const transporter = createMailSender()
-
-    const qrPath = path.resolve(`./qrcode.png`)
-    await fs.promises.writeFile(qrPath, qrBuffer as NodeJS.ArrayBufferView)
-
-    const info = await transporter.sendMail({
-      from: `"WeChat Login" <${SMTP_USER || '1323943635@qq.com'}>`,
-      to: TO_EMAIL!,
-      subject: '请扫码登录微信（自动签到机器人）',
-      text: '请使用微信扫描附件二维码进行登录授权。',
-      attachments: [
-        {
-          filename: `wechat_login_${uuid}.png`,
-          path: qrPath,
-        },
-      ],
+    const info = await getTransporter().sendMail({
+      from: `"${config.email.fromName}" <${config.email.user}>`,
+      to: config.email.to,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      attachments,
+      headers: {
+        'X-Auto-Response-Suppress': 'OOF, AutoReply',
+      },
     })
 
-    fs.unlinkSync(qrPath)
-    console.log('✅ 邮件已发送:', info.messageId)
+    console.log(`📧 邮件已发送：${content.subject}（${info.messageId}）`)
+    return true
   } catch (err: any) {
-    // 发送失败仅记录，不抛出
-    console.log(
-      `⚠️ 发送邮件失败：请前往网址扫描二维码：https://open.weixin.qq.com/connect/qrcode/${uuid}`
-    )
+    console.error(`❌ 邮件发送失败：${content.subject} - ${err?.message || err}`)
+    return false
   }
 }
 
-export async function sendCheckinResult(result: any): Promise<void> {
-  if (!EMAIL_ENABLE) {
-    return
-  }
-  try {
-    console.log('📧 正在发送签到结果邮件...')
-    const transporter = createMailSender()
-    const info = await transporter.sendMail({
-      from: `"WeChat Login" <${SMTP_USER || '1323943635@qq.com'}>`,
-      to: TO_EMAIL!,
-      subject: `签到结果 - ${result?.Data || '未知'}`,
-      text: `${result?.Description || JSON.stringify(result)}`,
-    })
-    console.log('✅ 邮件已发送:', info.messageId)
-  } catch (err: any) {
-    console.warn(
-      '⚠️ 发送签到结果邮件失败:',
-      err?.message || err
-    )
-  }
+export async function sendLoginRequiredEmail(options: {
+  reason: 'missing' | 'expired' | 'checkin' | 'login-failed'
+  currentExpire: number | null
+  estimatedNextExpire: number
+}): Promise<boolean> {
+  const loginSource = options.reason === 'checkin' ? 'checkin' : 'invalid'
+  const content = buildLoginRequiredEmail({
+    reason: options.reason,
+    currentExpire: options.currentExpire,
+    estimatedNextExpire: options.estimatedNextExpire,
+    loginUrl: actionUrl('/webhook/login', { source: loginSource }),
+    statusUrl: actionUrl('/status'),
+  })
+
+  return sendMail(content)
 }
 
+export async function sendLoginQrEmail(options: {
+  uuid: string
+  qrBuffer: Buffer
+  qrContentType: string
+  currentExpire: number | null
+  estimatedNextExpire: number
+  expiresAt: number
+  source: LoginSource
+}): Promise<boolean> {
+  const qrCid = 'wechat-login-qr'
+  const content = buildLoginQrEmail({
+    uuid: options.uuid,
+    qrCid,
+    currentExpire: options.currentExpire,
+    estimatedNextExpire: options.estimatedNextExpire,
+    expiresAt: options.expiresAt,
+    qrPageUrl: qrPageUrl(options.uuid),
+    statusUrl: actionUrl('/status'),
+    source: options.source,
+  })
+
+  const extension = options.qrContentType === 'image/png' ? 'png' : 'jpg'
+
+  return sendMail(content, [
+    {
+      filename: `wechat-login-${options.uuid}.${extension}`,
+      content: options.qrBuffer,
+      contentType: options.qrContentType,
+      cid: qrCid,
+    },
+  ])
+}
+
+export async function sendLoginSuccessEmail(options: {
+  expire: number
+  previousExpire: number | null
+  autoCheckin: boolean
+}): Promise<boolean> {
+  const content = buildLoginSuccessEmail({
+    expire: options.expire,
+    previousExpire: options.previousExpire,
+    autoCheckin: options.autoCheckin,
+    checkinUrl: actionUrl('/confirm/checkin'),
+    statusUrl: actionUrl('/status'),
+  })
+
+  return sendMail(content)
+}
+
+export async function sendTokenExpiringEmail(options: {
+  expire: number
+  estimatedNextExpire: number
+}): Promise<boolean> {
+  const content = buildTokenExpiringEmail({
+    expire: options.expire,
+    estimatedNextExpire: options.estimatedNextExpire,
+    loginUrl: actionUrl('/webhook/login', { source: 'warning' }),
+    checkinUrl: actionUrl('/confirm/checkin'),
+    statusUrl: actionUrl('/status'),
+  })
+
+  return sendMail(content)
+}
+
+export async function sendCheckinResultEmail(options: {
+  success: boolean
+  message: string
+  checkedAt: number
+  tokenExpire: number | null
+  authRequired: boolean
+  infoSummary: string
+}): Promise<boolean> {
+  const content = buildCheckinResultEmail({
+    success: options.success,
+    message: options.message,
+    checkedAt: options.checkedAt,
+    name: config.name,
+    threadId: config.checkin.threadId,
+    location: config.checkin.locationLabel,
+    tokenExpire: options.tokenExpire,
+    authRequired: options.authRequired,
+    infoSummary: options.infoSummary,
+    retryUrl: actionUrl('/confirm/checkin', { force: '1' }),
+    loginUrl: actionUrl('/webhook/login', { source: 'checkin' }),
+    statusUrl: actionUrl('/status'),
+  })
+
+  return sendMail(content)
+}
