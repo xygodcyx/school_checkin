@@ -54,13 +54,7 @@ export const config = {
   },
 
   token: {
-    warningHours: Math.max(0, envNumber('TOKEN_WARNING_HOURS', 48)),
     defaultTtlHours: Math.max(1, envNumber('TOKEN_TTL_HOURS', 72)),
-  },
-
-  notify: {
-    dayStartHour: clamp(envInt('NOTIFY_DAY_START', 9), 0, 23),
-    dayEndHour: clamp(envInt('NOTIFY_DAY_END', 21), 1, 24),
   },
 
   login: {
@@ -114,9 +108,5 @@ export function assertConfig(): void {
 
   if (!process.env.BASE_URL && !process.env.PUBLIC_BASE_URL) {
     console.warn(`⚠️ 未设置 BASE_URL，邮件中的操作链接将使用 ${config.baseUrl}，外部邮箱可能无法访问。`)
-  }
-
-  if (config.notify.dayStartHour >= config.notify.dayEndHour) {
-    throw new Error('❌ NOTIFY_DAY_START 必须小于 NOTIFY_DAY_END')
   }
 }

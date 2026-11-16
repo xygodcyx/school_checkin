@@ -256,8 +256,6 @@ export interface DashboardData {
   checkinTime: string
   nextCheckin: string
   timezone: string
-  warningHours: number
-  daytime: string
   lastCheckin: {
     time: string | null
     success: boolean | null
@@ -316,7 +314,7 @@ export function renderDashboardPage(data: DashboardData): string {
         ['最近签到时间', data.lastCheckin.time || '暂无记录'],
         ['最近签到结果', checkinResultText],
         ['最近服务响应', data.lastCheckin.message || '暂无记录'],
-        ['Token 提醒策略', `过期前 ${data.warningHours} 小时内，在 ${data.daytime} 的白天时段发送一次提醒`],
+        ['Token 提醒策略', 'Token 过期后发送一次登录提醒，不会提前提醒'],
       ])}
     </section>
 
@@ -361,23 +359,15 @@ export function renderDashboardPage(data: DashboardData): string {
       ]
     : [{ label: '查看状态 JSON', href: '/api/status', variant: 'secondary' }]
 
-  const expiringSoon = data.token.valid && data.token.tone === 'warning'
-
   return renderPage({
-    title: !data.token.valid
-      ? '需要重新登录微信'
-      : expiringSoon
-        ? 'Token 即将过期'
-        : '服务运行正常',
+    title: !data.token.valid ? '需要重新登录微信' : '服务运行正常',
     kicker: 'Service Dashboard',
     subtitle: !data.token.valid
       ? '当前登录状态不可用。请从提醒邮件中获取登录二维码，扫码后即可恢复自动签到。'
-      : expiringSoon
-        ? '当前 Token 已进入提醒窗口，建议在白天完成续期，避免影响每日自动签到。'
-        : '自动签到服务正在运行。Token 有效期内不需要任何操作，到期前会在白天发送一次提醒。',
+      : '自动签到服务正在运行。Token 有效期内不需要任何操作，过期后会发送一次登录提醒。',
     tone: data.token.tone,
-    badge: !data.token.valid ? '需要处理' : expiringSoon ? '需要续期' : '运行中',
-    icon: !data.token.valid ? '🔐' : expiringSoon ? '⏰' : '✅',
+    badge: !data.token.valid ? '需要处理' : '运行中',
+    icon: !data.token.valid ? '🔐' : '✅',
     content,
     actions,
     footer: `当前服务器时间：${data.serverTime}`,

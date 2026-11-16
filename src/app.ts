@@ -31,7 +31,6 @@ export async function createApplication(): Promise<Application> {
           !(current.lastCheckinDate === today && current.lastCheckinSuccess === true))
 
       await state.update({
-        warningSentForExpire: null,
         invalidNoticeSentForExpire: null,
         pendingCheckin: false,
         lastLoginAt: now,

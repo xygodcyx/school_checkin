@@ -4,7 +4,6 @@ import {
   formatDateTimeShort,
   formatDuration,
   getCheckinTimeLabel,
-  getDaytimeWindowLabel,
 } from './time-utils.js'
 
 type Tone = 'primary' | 'success' | 'warning' | 'danger'
@@ -428,13 +427,11 @@ export function buildLoginQrEmail(options: {
       icon: '📱',
       content,
       footerNote: `二维码来源：${
-        options.source === 'warning'
-          ? 'Token 过期提醒'
-          : options.source === 'checkin'
-            ? '签到失败重试'
-            : options.source === 'invalid'
-              ? '登录失效提醒'
-              : '手动获取'
+        options.source === 'checkin'
+          ? '签到失败重试'
+          : options.source === 'invalid'
+            ? '登录失效提醒'
+            : '手动获取'
       }`,
     }),
     text: buildText([
@@ -513,67 +510,6 @@ export function buildLoginSuccessEmail(options: {
       '',
       `立即签到：${options.checkinUrl}`,
       `查看服务状态：${options.statusUrl}`,
-    ]),
-  }
-}
-
-export function buildTokenExpiringEmail(options: {
-  expire: number
-  estimatedNextExpire: number
-  loginUrl: string
-  checkinUrl: string
-  statusUrl: string
-}): EmailContent {
-  const subject = `⏰ Token 即将过期 · ${formatDateTimeShort(options.expire)}`
-  const remaining = formatDuration(options.expire - Date.now())
-
-  const content = `
-    ${renderParagraph(`当前微信登录 Token 将在 <strong>${escapeHtml(formatDateTime(options.expire))}</strong> 过期。为避免影响每天 ${escapeHtml(getCheckinTimeLabel())} 的自动签到，建议在白天完成重新登录。`)}
-    ${renderInfoCard('过期与续期时间', [
-      ['当前 Token 过期时间', formatDateTime(options.expire)],
-      ['剩余有效时间', remaining],
-      ['重新登录后预计有效期至', formatDateTime(options.estimatedNextExpire)],
-      ['每日自动签到时间', `每天 ${getCheckinTimeLabel()}`],
-    ])}
-    ${renderCallout(
-      'warning',
-      `本次提醒仅在白天发送一次`,
-      `提醒邮件只在 ${getDaytimeWindowLabel()} 之间发送一次，不会反复打扰。点击下方按钮后，系统会立即发送一封包含登录二维码的邮件；扫码成功后，你会收到新的实际过期时间。`,
-    )}
-    ${renderActions([
-      { label: '接收登录二维码', url: options.loginUrl },
-      { label: '立即签到', url: options.checkinUrl, variant: 'secondary' },
-      { label: '查看服务状态', url: options.statusUrl, variant: 'secondary' },
-    ])}
-  `
-
-  return {
-    subject,
-    html: renderLayout({
-      subject,
-      preheader: `Token 将于 ${formatDateTime(options.expire)} 过期，点击获取登录二维码。`,
-      kicker: 'Expiry Warning',
-      title: 'Token 即将过期',
-      subtitle: '提前完成续期，避免错过每日自动签到。',
-      badge: '需要关注',
-      tone: 'warning',
-      icon: '⏰',
-      content,
-      footerNote: '此提醒每个 Token 只发送一次，且仅在白天发送。',
-    }),
-    text: buildText([
-      '校园自动签到 - Token 即将过期',
-      '',
-      `当前 Token 过期时间：${formatDateTime(options.expire)}`,
-      `剩余有效时间：${remaining}`,
-      `重新登录后预计有效期至：${formatDateTime(options.estimatedNextExpire)}`,
-      `每日自动签到时间：每天 ${getCheckinTimeLabel()}`,
-      '',
-      `接收登录二维码：${options.loginUrl}`,
-      `立即签到：${options.checkinUrl}`,
-      `查看服务状态：${options.statusUrl}`,
-      '',
-      `提醒邮件只在 ${getDaytimeWindowLabel()} 之间发送一次。`,
     ]),
   }
 }

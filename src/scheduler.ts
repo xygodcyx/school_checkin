@@ -64,9 +64,8 @@ export class Scheduler {
 
       try {
         const token = await TokenInfo.load()
-        if (token.isValid()) {
-          await this.notifications.notifyTokenExpiring(token)
-        } else {
+        // 重新登录不会刷新 Token，提前提醒没有意义；仅在 Token 过期后提醒一次。
+        if (!token.isValid()) {
           await this.notifications.notifyInvalidToken(token)
         }
       } catch (err: any) {

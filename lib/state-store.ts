@@ -9,10 +9,8 @@ export interface PersistedState {
   lastCheckinMessage: string | null
   lastScheduledCheckinDate: string | null
   pendingCheckin: boolean
-  warningSentForExpire: number | null
   invalidNoticeSentForExpire: number | null
   lastInvalidNoticeAt: number | null
-  lastWarningAt: number | null
   lastLoginAt: number | null
   lastLoginSuccessExpire: number | null
 }
@@ -25,10 +23,8 @@ export const DEFAULT_STATE: PersistedState = {
   lastCheckinMessage: null,
   lastScheduledCheckinDate: null,
   pendingCheckin: false,
-  warningSentForExpire: null,
   invalidNoticeSentForExpire: null,
   lastInvalidNoticeAt: null,
-  lastWarningAt: null,
   lastLoginAt: null,
   lastLoginSuccessExpire: null,
 }

@@ -10,7 +10,6 @@ import {
   formatDateTime,
   formatDuration,
   getCheckinTimeLabel,
-  getDaytimeWindowLabel,
   getZonedTime,
 } from '../lib/time-utils.js'
 import { TokenInfo } from '../lib/token-info.js'
@@ -96,7 +95,6 @@ function tokenStatus(token: TokenInfo) {
   const now = Date.now()
   const valid = token.isValid(now)
   const remainingMs = token.remainingMs(now)
-  const warningWindowMs = config.token.warningHours * 60 * 60 * 1000
   const ttlMs = token.getTtlMs()
 
   return {
@@ -107,7 +105,6 @@ function tokenStatus(token: TokenInfo) {
     expireText: token.expire ? formatDateTime(token.expire) : '暂无 Token',
     remainingMs,
     remainingText: token.expire ? (valid ? formatDuration(remainingMs) : '已过期') : '无',
-    expiringSoon: valid && remainingMs <= warningWindowMs,
     ttlHours: ttlMs ? Math.round(ttlMs / 3_600_000) : config.token.defaultTtlHours,
     estimatedNextExpireText: formatDateTime(token.estimateNextExpire(now)),
   }
@@ -140,8 +137,6 @@ async function buildStatusPayload(request: Request, url: URL, deps: ServerDeps) 
       checkinTime: getCheckinTimeLabel(),
       nextCheckin: describeNextCheckin(now),
       timezone: config.timezone,
-      warningHours: config.token.warningHours,
-      daytimeWindow: getDaytimeWindowLabel(),
       qrTtlSeconds: config.login.qrTtlSeconds,
     },
     lastCheckin: {
@@ -179,7 +174,7 @@ async function handleLogin(
   respondJson: boolean,
 ): Promise<Response> {
   const sourceRaw = url.searchParams.get('source') || 'manual'
-  const allowedSources: LoginSource[] = ['manual', 'warning', 'invalid', 'checkin']
+  const allowedSources: LoginSource[] = ['manual', 'invalid', 'checkin']
   const source: LoginSource = allowedSources.includes(sourceRaw as LoginSource)
     ? (sourceRaw as LoginSource)
     : 'manual'
@@ -354,14 +349,12 @@ function renderDashboard(
       valid: data.token.valid,
       expireText: data.token.expireText,
       remainingText: data.token.remainingText,
-      tone: data.token.valid ? (data.token.expiringSoon ? 'warning' : 'success') : 'danger',
+      tone: data.token.valid ? 'success' : 'danger',
     },
     emailEnabled: data.email.enabled,
     checkinTime: data.schedule.checkinTime,
     nextCheckin: data.schedule.nextCheckin,
     timezone: data.schedule.timezone,
-    warningHours: data.schedule.warningHours,
-    daytime: data.schedule.daytimeWindow,
     lastCheckin: {
       time: lastCheckin.atText,
       success: lastCheckin.success,

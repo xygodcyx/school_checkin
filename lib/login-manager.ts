@@ -6,7 +6,7 @@ import { TokenInfo } from './token-info.js'
 import { qrPageUrl } from './urls.js'
 import { fetchUUID, pollWxCode, sleep } from './wechat-utils.js'
 
-export type LoginSource = 'manual' | 'warning' | 'invalid' | 'checkin'
+export type LoginSource = 'manual' | 'invalid' | 'checkin'
 
 export type LoginSessionStatus = 'pending' | 'success' | 'expired' | 'error'
 

@@ -8,9 +8,9 @@
 
 - **常驻 Webhook 服务**：基于 Bun 原生 HTTP Server，提供状态查询、登录、签到等接口。
 - **不会循环轰炸邮箱**：
-  - Token 失效时只发送一封登录提醒；
-  - Token 即将过期时只在白天发送一次提醒；
-  - 同一 Token 的提醒会持久化去重，服务重启也不会重复发送。
+  - 仅在 Token 实际过期后发送一封登录提醒，不会提前提醒；
+  - 重新登录不会刷新 Token 的有效期，因此提前提醒没有意义；
+  - 同一 Token 的提醒会持久化去重，服务重启也不会重复发送；
   - 每天 18:00 的签到结果邮件是独立通知，即使 Token 仍失效，也只会每天发送当天的签到结果，不会循环发送。
 - **精确的过期时间**：所有与 Token 相关的邮件都会写明具体过期时间，精确到分钟并包含星期，例如：
   `2026年11月16日 星期一 18:35（北京时间）`
@@ -26,7 +26,7 @@
 
 ## 🔄 工作流程
 
-### 1. Token 失效时
+### 1. Token 过期时
 
 ```text
 检测到 Token 不存在 / 已过期
@@ -42,21 +42,9 @@
 保存新 Token，发送“登录成功”邮件，写明实际过期时间
 ```
 
-### 2. Token 即将过期时
+> Token 过期前不会发送提醒，因为重新登录不会刷新 Token 的有效期。
 
-```text
-距离 Token 过期 ≤ TOKEN_WARNING_HOURS（默认 48 小时）
-        ↓
-仅在白天时段（默认 09:00 - 21:00）发送一次提醒
-        ↓
-邮件写明当前过期时间、剩余时间、重新登录后预计有效期
-        ↓
-用户点击「接收登录二维码」
-        ↓
-收到二维码邮件 → 扫码 → 收到实际有效期确认邮件
-```
-
-### 3. 每日签到
+### 2. 每日签到
 
 ```text
 每天 18:00（Asia/Shanghai）
@@ -113,13 +101,12 @@ cp .env.example .env
 | `CHECKIN_LONGITUDE` | `117.976543` | 签到经度 |
 | `CHECKIN_LOCATION_LABEL` | `上饶市信州区•上饶师范学院` | 签到地点文本 |
 
-### Token 提醒配置
+### Token 与登录配置
+
+服务只在 Token 实际过期后发送一次登录提醒，不需要配置提醒窗口。
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `TOKEN_WARNING_HOURS` | `48` | 距离过期多少小时进入提醒窗口 |
-| `NOTIFY_DAY_START` | `9` | 白天提醒起始小时 |
-| `NOTIFY_DAY_END` | `21` | 白天提醒结束小时 |
 | `QR_TTL_SECONDS` | `300` | 登录二维码有效期 |
 | `QR_EMAIL_RESEND_SECONDS` | `10` | 重复点击时二维码邮件的最短重发间隔 |
 | `TOKEN_TTL_HOURS` | `72` | 无法从 JWT 推断时的默认 Token 有效期，用于“预计有效期” |
@@ -344,7 +331,6 @@ curl "https://checkin.example.com/api/checkin?token=YOUR_WEBHOOK_SECRET&force=1"
 | 邮件 | 触发时机 | 关键内容 |
 | --- | --- | --- |
 | 需要重新登录 | Token 不存在或已过期，且尚未提醒过 | 当前过期时间、登录后预计有效期、登录按钮 |
-| Token 即将过期 | 进入提醒窗口且处于白天，且尚未提醒过 | 精确过期时间、剩余时间、续期按钮 |
 | 微信登录二维码 | 用户点击「接收登录二维码」 | 二维码图片、二维码有效期、登录后预计有效期 |
 | 登录成功 | 扫码并换取 Token 成功 | 新 Token **实际**过期时间、剩余有效期、签到按钮 |
 | 签到结果 | 每天 18:00 自动签到后 / 手动签到后 | 成功或失败、签到时间、地点、服务响应、Token 有效期 |
@@ -421,7 +407,7 @@ school_checkin/
 │   ├── state-store.ts        # data/state.json 持久化状态
 │   ├── token-info.ts         # Token 读取、保存、JWT 有效期推断
 │   ├── login-manager.ts      # 二维码登录会话、扫码轮询
-│   ├── notification-service.ts # 登录失效/即将过期/登录成功通知
+│   ├── notification-service.ts # 登录失效/登录成功通知
 │   ├── checkin-service.ts    # 签到流程与结果邮件
 │   ├── checkin-utils.ts      # 签到 API 请求与响应判断
 │   ├── email-templates.ts    # HTML + CSS 邮件模板
@@ -462,15 +448,9 @@ CHECKIN_HOUR=18
 CHECKIN_MINUTE=0
 ```
 
-### 更改提醒窗口
+### Token 提醒策略
 
-```env
-# 提前 48 小时进入提醒窗口
-TOKEN_WARNING_HOURS=48
-# 仅在 09:00 - 21:00 之间发送提醒
-NOTIFY_DAY_START=9
-NOTIFY_DAY_END=21
-```
+服务不会在 Token 过期前提醒。Token 实际过期后，会发送一次登录提醒；同一个 Token 不会重复发送。
 
 ### 更换签到任务
 

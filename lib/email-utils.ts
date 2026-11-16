@@ -5,7 +5,6 @@ import {
   buildLoginQrEmail,
   buildLoginRequiredEmail,
   buildLoginSuccessEmail,
-  buildTokenExpiringEmail,
   type EmailContent,
 } from './email-templates.js'
 import { actionUrl, qrPageUrl } from './urls.js'
@@ -129,21 +128,6 @@ export async function sendLoginSuccessEmail(options: {
     expire: options.expire,
     previousExpire: options.previousExpire,
     autoCheckin: options.autoCheckin,
-    checkinUrl: actionUrl('/confirm/checkin'),
-    statusUrl: actionUrl('/status'),
-  })
-
-  return sendMail(content)
-}
-
-export async function sendTokenExpiringEmail(options: {
-  expire: number
-  estimatedNextExpire: number
-}): Promise<boolean> {
-  const content = buildTokenExpiringEmail({
-    expire: options.expire,
-    estimatedNextExpire: options.estimatedNextExpire,
-    loginUrl: actionUrl('/webhook/login', { source: 'warning' }),
     checkinUrl: actionUrl('/confirm/checkin'),
     statusUrl: actionUrl('/status'),
   })

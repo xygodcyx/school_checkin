@@ -1,12 +1,9 @@
-import { config } from './config.js'
 import {
   isEmailEnabled,
   sendLoginRequiredEmail,
   sendLoginSuccessEmail,
-  sendTokenExpiringEmail,
 } from './email-utils.js'
 import { StateStore } from './state-store.js'
-import { isDaytime } from './time-utils.js'
 import { TokenInfo } from './token-info.js'
 
 const RETRY_INTERVAL_MS = 10 * 60 * 1000
@@ -48,34 +45,6 @@ export class NotificationService {
         lastInvalidNoticeAt: Date.now(),
       })
       console.log('📧 已发送登录失效提醒（本 Token 仅发送一次）。')
-    }
-
-    return sent
-  }
-
-  async notifyTokenExpiring(token: TokenInfo): Promise<boolean> {
-    if (!isEmailEnabled() || !token.isValid() || !token.expire) return false
-
-    const remaining = token.remainingMs()
-    const warningWindow = config.token.warningHours * 60 * 60 * 1000
-    if (remaining <= 0 || remaining > warningWindow) return false
-    if (!isDaytime()) return false
-
-    const current = this.state.get()
-    if (current.warningSentForExpire === token.expire) return false
-    if (!this.canAttempt(`warning:${token.expire}`)) return false
-
-    const sent = await sendTokenExpiringEmail({
-      expire: token.expire,
-      estimatedNextExpire: token.estimateNextExpire(),
-    })
-
-    if (sent) {
-      await this.state.update({
-        warningSentForExpire: token.expire,
-        lastWarningAt: Date.now(),
-      })
-      console.log('📧 已发送 Token 即将过期提醒（本 Token 仅发送一次）。')
     }
 
     return sent

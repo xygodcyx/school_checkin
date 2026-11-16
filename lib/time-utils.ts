@@ -95,11 +95,6 @@ export function formatDuration(milliseconds: number): string {
   return parts.join(' ')
 }
 
-export function isDaytime(timestamp: number = Date.now()): boolean {
-  const { hour } = getZonedTime(timestamp)
-  return hour >= config.notify.dayStartHour && hour < config.notify.dayEndHour
-}
-
 export function isAtOrAfterCheckin(timestamp: number = Date.now()): boolean {
   const { minutesOfDay } = getZonedTime(timestamp)
   return minutesOfDay >= config.checkin.hour * 60 + config.checkin.minute
@@ -107,10 +102,6 @@ export function isAtOrAfterCheckin(timestamp: number = Date.now()): boolean {
 
 export function getCheckinTimeLabel(): string {
   return `${pad2(config.checkin.hour)}:${pad2(config.checkin.minute)}`
-}
-
-export function getDaytimeWindowLabel(): string {
-  return `${pad2(config.notify.dayStartHour)}:00 - ${pad2(config.notify.dayEndHour)}:00`
 }
 
 /** 今天 18:00 / 明天 18:00 */
