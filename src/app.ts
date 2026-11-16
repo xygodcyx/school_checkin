@@ -3,7 +3,7 @@ import { CheckinService } from '../lib/checkin-service.js'
 import { LoginManager } from '../lib/login-manager.js'
 import { NotificationService } from '../lib/notification-service.js'
 import { StateStore } from '../lib/state-store.js'
-import { getDateKey, isAtOrAfterCheckin } from '../lib/time-utils.js'
+import { getDateKey, isWithinPostLoginCheckinWindow } from '../lib/time-utils.js'
 import { closeTokenStore } from '../lib/token-info.js'
 import { createRequestHandler } from './server.js'
 import { Scheduler } from './scheduler.js'
@@ -25,10 +25,13 @@ export async function createApplication(): Promise<Application> {
       const today = getDateKey(now)
       const current = state.get()
 
+      const alreadySucceededToday =
+        current.lastCheckinDate === today && current.lastCheckinSuccess === true
+
+      // 仅在当天签到时间后、23:00 前重新登录时自动补签；
+      // 第二天 18:00 前登录不会补签前一天的任务。
       const shouldCheckin =
-        current.pendingCheckin ||
-        (isAtOrAfterCheckin(now) &&
-          !(current.lastCheckinDate === today && current.lastCheckinSuccess === true))
+        !alreadySucceededToday && isWithinPostLoginCheckinWindow(now)
 
       await state.update({
         invalidNoticeSentForExpire: null,

@@ -1,5 +1,8 @@
 import { config } from './config.js'
 
+/** 登录后自动补签的截止时间：当天 23:00 前 */
+const POST_LOGIN_CHECKIN_DEADLINE_HOUR = 23
+
 export interface ZonedTime {
   timestamp: number
   year: string
@@ -100,8 +103,23 @@ export function isAtOrAfterCheckin(timestamp: number = Date.now()): boolean {
   return minutesOfDay >= config.checkin.hour * 60 + config.checkin.minute
 }
 
+/**
+ * 登录后自动补签的时间窗口：当天签到时间起，至 23:00 前。
+ * 第二天 18:00 前登录不会补签前一天的任务。
+ */
+export function isWithinPostLoginCheckinWindow(timestamp: number = Date.now()): boolean {
+  const { minutesOfDay } = getZonedTime(timestamp)
+  const checkinMinutes = config.checkin.hour * 60 + config.checkin.minute
+  return minutesOfDay >= checkinMinutes && minutesOfDay < POST_LOGIN_CHECKIN_DEADLINE_HOUR * 60
+}
+
 export function getCheckinTimeLabel(): string {
   return `${pad2(config.checkin.hour)}:${pad2(config.checkin.minute)}`
+}
+
+/** 18:00 - 23:00 */
+export function getPostLoginCheckinWindowLabel(): string {
+  return `${getCheckinTimeLabel()} - ${pad2(POST_LOGIN_CHECKIN_DEADLINE_HOUR)}:00`
 }
 
 /** 今天 18:00 / 明天 18:00 */

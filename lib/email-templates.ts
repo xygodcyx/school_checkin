@@ -4,6 +4,7 @@ import {
   formatDateTimeShort,
   formatDuration,
   getCheckinTimeLabel,
+  getPostLoginCheckinWindowLabel,
 } from './time-utils.js'
 
 type Tone = 'primary' | 'success' | 'warning' | 'danger'
@@ -316,7 +317,7 @@ export function buildLoginRequiredEmail(options: {
     ${renderCallout(
       'warning',
       '如何恢复自动签到？',
-      '点击下方“接收登录二维码”按钮，系统会立即发送一封包含登录二维码的邮件。请使用微信扫一扫完成授权，二维码约 5 分钟内有效。登录成功后，你会收到一封包含实际 Token 过期时间的确认邮件。',
+      `点击下方“接收登录二维码”按钮，系统会立即发送一封包含登录二维码的邮件。请使用微信扫一扫完成授权，二维码约 5 分钟内有效。登录成功后，你会收到一封包含实际 Token 过期时间的确认邮件。如果在当天 ${getPostLoginCheckinWindowLabel()} 内完成登录，系统会自动补签一次。`,
     )}
     ${renderActions([
       { label: '接收登录二维码', url: options.loginUrl },
@@ -356,6 +357,7 @@ export function buildLoginRequiredEmail(options: {
       `查看服务状态：${options.statusUrl}`,
       '',
       '点击按钮后系统会发送一封包含二维码的邮件，二维码约 5 分钟内有效。',
+      `如果在当天 ${getPostLoginCheckinWindowLabel()} 内完成登录，系统会自动补签一次。`,
       '本服务不会反复发送提醒邮件。',
     ]),
   }
@@ -575,7 +577,7 @@ export function buildCheckinResultEmail(options: {
             options.authRequired ? 'warning' : 'danger',
             '接下来怎么做？',
             options.authRequired
-              ? '请先点击下方按钮获取登录二维码，完成微信授权后系统会自动继续今日签到。也可以稍后重新签到。'
+              ? `请先点击下方按钮获取登录二维码。如果在当天 ${getPostLoginCheckinWindowLabel()} 内完成登录，系统会自动补签一次；其他时间登录请等待下一次定时签到。`
               : '可以点击“重新签到”立即重试。如果多次失败，请检查服务日志或查看服务状态页面。',
           )
     }
@@ -621,6 +623,9 @@ export function buildCheckinResultEmail(options: {
       `服务响应：${options.message}`,
       '',
       options.success ? `下一次签到：${describeNextCheckin()}` : `重新签到：${options.retryUrl}`,
+      ...(options.authRequired
+        ? [`登录后自动补签：当天 ${getPostLoginCheckinWindowLabel()} 内完成登录会自动补签一次`]
+        : []),
       `接收登录二维码：${options.loginUrl}`,
       `查看服务状态：${options.statusUrl}`,
     ]),

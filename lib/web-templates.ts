@@ -256,6 +256,7 @@ export interface DashboardData {
   checkinTime: string
   nextCheckin: string
   timezone: string
+  postLoginCheckinWindow: string
   lastCheckin: {
     time: string | null
     success: boolean | null
@@ -315,6 +316,7 @@ export function renderDashboardPage(data: DashboardData): string {
         ['最近签到结果', checkinResultText],
         ['最近服务响应', data.lastCheckin.message || '暂无记录'],
         ['Token 提醒策略', 'Token 过期后发送一次登录提醒，不会提前提醒'],
+        ['登录后补签', `当天 ${data.postLoginCheckinWindow} 内重新登录会自动补签一次`],
       ])}
     </section>
 

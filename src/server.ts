@@ -10,6 +10,7 @@ import {
   formatDateTime,
   formatDuration,
   getCheckinTimeLabel,
+  getPostLoginCheckinWindowLabel,
   getZonedTime,
 } from '../lib/time-utils.js'
 import { TokenInfo } from '../lib/token-info.js'
@@ -137,6 +138,7 @@ async function buildStatusPayload(request: Request, url: URL, deps: ServerDeps) 
       checkinTime: getCheckinTimeLabel(),
       nextCheckin: describeNextCheckin(now),
       timezone: config.timezone,
+      postLoginCheckinWindow: getPostLoginCheckinWindowLabel(),
       qrTtlSeconds: config.login.qrTtlSeconds,
     },
     lastCheckin: {
@@ -330,7 +332,7 @@ async function handleCheckin(
       calloutBody: outcome.success
         ? `下一次自动签到将在${describeNextCheckin()}执行，完成后会发送结果邮件。`
         : outcome.authRequired
-          ? '登录成功后，系统会自动继续今日签到，并发送签到结果邮件。'
+          ? `如果在当天 ${getPostLoginCheckinWindowLabel()} 内完成登录，系统会自动补签一次；其他时间登录请等待下一次定时签到。`
           : '可以点击“重新签到”立即重试。如果连续失败，请查看服务日志。',
     }),
   )
@@ -355,6 +357,7 @@ function renderDashboard(
     checkinTime: data.schedule.checkinTime,
     nextCheckin: data.schedule.nextCheckin,
     timezone: data.schedule.timezone,
+    postLoginCheckinWindow: data.schedule.postLoginCheckinWindow,
     lastCheckin: {
       time: lastCheckin.atText,
       success: lastCheckin.success,
